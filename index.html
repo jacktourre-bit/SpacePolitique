@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="description" content="Bourrage de Crâne : Mode Révolution — shoot'em up satirique pixel-art. Déprogramme les avatars politiques avant la saturation de ton cerveau.">
+  <title>Bourrage de Crâne : Mode Révolution</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div id="game-container">
+    <canvas id="game" width="480" height="854"></canvas>
+
+    <!-- ===================== HUD EN JEU ===================== -->
+    <div id="hud" class="hidden">
+      <div class="hud-row">
+        <span id="hud-score">SCORE 0</span>
+        <span id="hud-level">NIV 1</span>
+        <span id="hud-lives">❤❤❤</span>
+      </div>
+      <div class="hud-row">
+        <div id="bourrage-wrap" title="Jauge de Bourrage de Crâne">
+          <span class="bourrage-label">BOURRAGE DE CRÂNE</span>
+          <div id="bourrage-bar"><div id="bourrage-fill"></div></div>
+        </div>
+        <span id="hud-influence">—</span>
+      </div>
+    </div>
+
+    <!-- Boutons tactiles / utilitaires -->
+    <div id="touch-controls" class="hidden">
+      <button id="btn-pause" class="ctl-btn" title="Pause (P)">II</button>
+      <button id="btn-autofire" class="ctl-btn" title="Tir automatique">AUTO</button>
+      <button id="btn-mute" class="ctl-btn" title="Son (M)">♪</button>
+    </div>
+
+    <!-- ===================== ÉCRAN TITRE ===================== -->
+    <div id="screen-title" class="screen">
+      <h1 class="logo">BOURRAGE<br>DE CRÂNE</h1>
+      <h2 class="logo-sub">★ MODE RÉVOLUTION ★</h2>
+      <p class="tagline">Pilote le Neurone Libre à travers un cerveau envahi<br>
+        par des avatars politiques pixelisés.<br>
+        Déprogramme-les avant la saturation totale !</p>
+      <div class="menu">
+        <button id="btn-start" class="big-btn">LANCER LA PARTIE</button>
+        <button id="btn-leaderboard" class="big-btn">CLASSEMENT</button>
+        <button id="btn-credits" class="big-btn">CRÉDITS</button>
+        <button id="btn-fullscreen" class="big-btn">PLEIN ÉCRAN</button>
+      </div>
+      <p class="disclaimer">Satire pixelisée — personnages caricaturaux de fiction.<br>
+        Ici on ne tue personne : on <em>déprogramme</em>.</p>
+    </div>
+
+    <!-- ===================== DIFFICULTÉ ===================== -->
+    <div id="screen-difficulty" class="screen hidden">
+      <h2 class="screen-title">CHOISIS TA DOSE</h2>
+      <div class="menu">
+        <button class="big-btn btn-diff" data-diff="facile">FACILE<small>Tir auto · ennemis lents</small></button>
+        <button class="big-btn btn-diff" data-diff="normal">NORMAL<small>Arcade standard</small></button>
+        <button class="big-btn btn-diff" data-diff="cauchemar">CAUCHEMAR MÉDIATIQUE<small>Rapide · bourrage accéléré</small></button>
+      </div>
+      <button id="btn-diff-back" class="small-btn">← RETOUR</button>
+    </div>
+
+    <!-- ===================== INTRO DE NIVEAU ===================== -->
+    <div id="screen-levelintro" class="screen hidden">
+      <h2 id="intro-level-name" class="screen-title">NIVEAU 1</h2>
+      <p id="intro-level-text" class="intro-text"></p>
+      <div id="intro-cast"></div>
+      <button id="btn-go" class="big-btn">EN AVANT !</button>
+    </div>
+
+    <!-- ===================== PAUSE ===================== -->
+    <div id="screen-pause" class="screen hidden translucent">
+      <h2 class="screen-title">PAUSE</h2>
+      <div class="menu">
+        <button id="btn-resume" class="big-btn">REPRENDRE</button>
+        <button id="btn-quit" class="big-btn">ABANDONNER</button>
+      </div>
+    </div>
+
+    <!-- ===================== GAME OVER ===================== -->
+    <div id="screen-gameover" class="screen hidden">
+      <h2 id="go-title" class="screen-title danger">CERVEAU SATURÉ</h2>
+      <p class="result-line">Score : <span id="go-score">0</span></p>
+      <p class="result-line">Niveau atteint : <span id="go-level">1</span></p>
+      <p class="result-line">Diagnostic d'orientation :</p>
+      <p id="go-orientation" class="orientation">???</p>
+      <div class="name-entry">
+        <input id="go-name" type="text" maxlength="12" placeholder="TON BLAZE (12 max)">
+        <button id="btn-save-score" class="big-btn">ENREGISTRER</button>
+      </div>
+      <button id="btn-go-menu" class="small-btn">MENU</button>
+    </div>
+
+    <!-- ===================== VICTOIRE ===================== -->
+    <div id="screen-victory" class="screen hidden">
+      <h2 class="screen-title gold">RANG : RÉVOLUTIONNAIRE</h2>
+      <p class="intro-text">Tu as traversé tous les dogmes, esquivé les slogans<br>
+        et survécu aux plateaux TV.</p>
+      <p class="result-line">Score final : <span id="v-score">0</span></p>
+      <div class="name-entry">
+        <input id="v-name" type="text" maxlength="12" placeholder="TON BLAZE (12 max)">
+        <button id="btn-save-victory" class="big-btn">ENREGISTRER</button>
+      </div>
+      <button id="btn-v-menu" class="small-btn">MENU</button>
+    </div>
+
+    <!-- ===================== CLASSEMENT ===================== -->
+    <div id="screen-leaderboard" class="screen hidden">
+      <h2 class="screen-title">HALL OF FAME</h2>
+      <div id="lb-tabs">
+        <button class="lb-tab active" data-period="global">GLOBAL</button>
+        <button class="lb-tab" data-period="month">MOIS</button>
+        <button class="lb-tab" data-period="week">SEMAINE</button>
+        <button class="lb-tab" data-period="day">JOUR</button>
+      </div>
+      <div id="lb-list"></div>
+      <button id="btn-lb-back" class="small-btn">← RETOUR</button>
+    </div>
+
+    <!-- ===================== CRÉDITS ===================== -->
+    <div id="screen-credits" class="screen hidden">
+      <h2 class="screen-title">CRÉDITS</h2>
+      <p class="intro-text">
+        Un jeu satirique pixelisé, sans haine et sans gore.<br><br>
+        Tous les personnages sont des <strong>caricatures de fiction</strong>
+        inspirées de figures publiques. Les dialogues sont absurdes et inventés.
+        Aucun politicien n'a été blessé : ils sont seulement
+        <em>déprogrammés</em> en confettis.<br><br>
+        Moteur : Canvas 2D vanilla · Sprites : générateur pixel-art procédural ·
+        Sons : WebAudio 8-bit.<br><br>
+        Chaque partie est unique : les trajectoires et stratégies ennemies
+        sont retirées au sort à chaque run.
+      </p>
+      <button id="btn-credits-back" class="small-btn">← RETOUR</button>
+    </div>
+  </div>
+
+  <!-- Données puis moteur -->
+  <script src="characters.js"></script>
+  <script src="levels.js"></script>
+  <script src="leaderboard.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
