@@ -24,10 +24,15 @@ Aucune installation, aucun build, aucun serveur :
 
 ## 🕹️ Contrôles
 
+Sur écran tactile, l'interface est **100 % tactile** : le tir automatique est
+activé d'office, le vaisseau suit le doigt (avec un décalage vers le haut pour ne
+jamais être masqué, et un halo indique le point de contact), et tous les menus,
+la pause, le son et le plein écran se pilotent au doigt.
+
 | Action | Desktop | Mobile |
 |---|---|---|
-| Déplacer | Flèches ou ZQSD/WASD | Glisser le doigt |
-| Tirer (Pensées Critiques) | Espace | Maintien du doigt / bouton AUTO |
+| Déplacer | Flèches ou ZQSD/WASD | Glisser le doigt n'importe où |
+| Tirer (Pensées Critiques) | Espace | Automatique (bouton AUTO pour désactiver) |
 | Pause | P ou bouton II | Bouton II |
 | Son | M ou bouton ♪ | Bouton ♪ |
 

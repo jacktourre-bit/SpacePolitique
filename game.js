@@ -38,6 +38,11 @@ const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 ctx.imageSmoothingEnabled = false;
 
+/* Détection d'écran tactile : sur mobile/tablette, l'interface est
+ * entièrement tactile (tir auto d'office, pilotage au doigt). */
+const IS_TOUCH = ("ontouchstart" in window) ||
+  (typeof navigator !== "undefined" && navigator.maxTouchPoints > 0);
+
 /* ============================ RNG SEEDÉ ============================ */
 function mulberry32(seed) {
   let a = seed >>> 0;
@@ -426,7 +431,7 @@ function spawnCrystals() {
 /* ============================ FLOW DU NIVEAU ============================ */
 function startRun(diffKey) {
   G.diff = DIFFICULTIES[diffKey];
-  G.autoFire = G.diff.autoFire;
+  G.autoFire = G.diff.autoFire || IS_TOUCH;
   $("btn-autofire").classList.toggle("active", G.autoFire);
   runRng = mulberry32(((Date.now() & 0xffffffff) ^ (Math.random() * 0xffffffff)) >>> 0);
   G.levelIndex = 0;
@@ -477,6 +482,9 @@ function beginLevel() {
   spawnWave();
   showScreen(null);
   banner(["NIVEAU " + level.id, level.name], 2.2, "#7df0ff");
+  if (IS_TOUCH && G.levelIndex === 0) {
+    toast("GLISSE TON DOIGT POUR PILOTER — TIR AUTOMATIQUE", "#7df0ff", 4);
+  }
   AudioFX.ensure();
 }
 
@@ -823,14 +831,10 @@ function update(dt) {
     player.y += mvy / d * speed * dt;
     player.touchTarget = null;
   } else if (player.touchTarget) {
-    const dx = player.touchTarget.x - player.x;
-    const dy = player.touchTarget.y - player.y;
-    const d = Math.hypot(dx, dy);
-    if (d > 4) {
-      const step = Math.min(d, speed * 1.4 * dt);
-      player.x += dx / d * step;
-      player.y += dy / d * step;
-    }
+    /* Suivi du doigt : lissage exponentiel, réactif sans téléportation */
+    const k = Math.min(1, dt * 11);
+    player.x += (player.touchTarget.x - player.x) * k;
+    player.y += (player.touchTarget.y - player.y) * k;
   }
   player.x = Math.max(18, Math.min(GAME_W - 18, player.x));
   player.y = Math.max(GAME_H * 0.45, Math.min(GAME_H - 30, player.y));
@@ -1158,6 +1162,15 @@ function render() {
     drawBullets();
     drawPowerups();
     drawPlayer();
+
+    /* Halo sous le doigt (interface tactile) */
+    if (pointerIndicator.active) {
+      ctx.strokeStyle = "rgba(125,240,255,0.35)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(pointerIndicator.x, pointerIndicator.y, 24 + Math.sin(G.time * 8) * 3, 0, 7);
+      ctx.stroke();
+    }
   }
 
   /* Particules */
@@ -1197,22 +1210,22 @@ function render() {
       const hp = bosses.reduce((s, b) => s + b.hp, 0);
       const max = bosses.reduce((s, b) => s + b.maxHp, 0);
       ctx.fillStyle = "rgba(0,0,0,0.5)";
-      ctx.fillRect(40, 64, GAME_W - 80, 14);
+      ctx.fillRect(40, 88, GAME_W - 80, 14);
       ctx.fillStyle = "#ff3355";
-      ctx.fillRect(42, 66, (GAME_W - 84) * Math.max(0, hp / max), 10);
+      ctx.fillRect(42, 90, (GAME_W - 84) * Math.max(0, hp / max), 10);
       ctx.strokeStyle = "#ffd166"; ctx.lineWidth = 2;
-      ctx.strokeRect(40, 64, GAME_W - 80, 14);
+      ctx.strokeRect(40, 88, GAME_W - 80, 14);
       ctx.fillStyle = "#ffd166";
       ctx.font = "bold 10px 'Courier New', monospace";
       ctx.textAlign = "center";
-      ctx.fillText(level.bossTitle, GAME_W / 2, 60);
+      ctx.fillText(level.bossTitle, GAME_W / 2, 84);
     }
     /* Combo */
     if (G.combo > 1) {
       ctx.fillStyle = "#ffd166";
       ctx.font = "bold 16px 'Courier New', monospace";
       ctx.textAlign = "center";
-      ctx.fillText("COMBO ×" + G.combo, GAME_W / 2, 100);
+      ctx.fillText("COMBO ×" + G.combo, GAME_W / 2, 124);
     }
   }
 
@@ -1386,21 +1399,34 @@ function canvasPos(ev) {
     y: (ev.clientY - r.top) / r.height * GAME_H
   };
 }
+/* Le vaisseau vole 90 px AU-DESSUS du doigt pour ne jamais être masqué */
+const TOUCH_OFFSET_Y = 90;
+const pointerIndicator = { x: 0, y: 0, active: false };
+
+function setTouchTarget(ev) {
+  const p = canvasPos(ev);
+  pointerIndicator.x = p.x; pointerIndicator.y = p.y;
+  player.touchTarget = {
+    x: p.x,
+    y: Math.max(GAME_H * 0.45, Math.min(GAME_H - 30, p.y - TOUCH_OFFSET_Y))
+  };
+}
 canvas.addEventListener("pointerdown", (ev) => {
   AudioFX.ensure();
   if (G.screen !== "playing" || G.paused) return;
-  const p = canvasPos(ev);
-  player.touchTarget = { x: p.x, y: Math.max(GAME_H * 0.45, p.y - 70) };
+  ev.preventDefault();
+  setTouchTarget(ev);
   player.touchFiring = true;
+  pointerIndicator.active = true;
   canvas.setPointerCapture(ev.pointerId);
 });
 canvas.addEventListener("pointermove", (ev) => {
   if (G.screen !== "playing" || G.paused || !player.touchFiring) return;
-  const p = canvasPos(ev);
-  player.touchTarget = { x: p.x, y: Math.max(GAME_H * 0.45, p.y - 70) };
+  ev.preventDefault();
+  setTouchTarget(ev);
 });
-canvas.addEventListener("pointerup", () => { player.touchFiring = false; });
-canvas.addEventListener("pointercancel", () => { player.touchFiring = false; });
+canvas.addEventListener("pointerup", () => { player.touchFiring = false; pointerIndicator.active = false; });
+canvas.addEventListener("pointercancel", () => { player.touchFiring = false; pointerIndicator.active = false; });
 
 /* ============================ PAUSE / MUTE ============================ */
 function togglePause() {

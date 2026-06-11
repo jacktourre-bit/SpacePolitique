@@ -20,9 +20,13 @@ html, body {
   font-family: "Courier New", monospace;
   overflow: hidden;
   touch-action: none;
+  overscroll-behavior: none;
   -webkit-user-select: none;
   user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
+
+button { touch-action: manipulation; }
 
 /* Conteneur 9:16 centré, adapté à l'écran sans déformation */
 #game-container {
@@ -94,26 +98,28 @@ html, body {
 }
 
 /* ============== Boutons tactiles / utilitaires ============== */
+/* En haut à droite, sous le HUD : hors de la zone de pilotage au doigt */
 #touch-controls {
   position: absolute;
-  right: 6px;
-  bottom: 8px;
+  right: 8px;
+  top: 56px;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  flex-direction: row;
+  gap: 10px;
   z-index: 6;
 }
 .ctl-btn {
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
   border: 2px solid var(--neon);
-  border-radius: 8px;
-  background: rgba(8, 4, 28, 0.7);
+  border-radius: 10px;
+  background: rgba(8, 4, 28, 0.75);
   color: var(--neon);
   font-family: inherit;
   font-weight: bold;
-  font-size: 11px;
+  font-size: 13px;
   cursor: pointer;
+  opacity: 0.9;
 }
 .ctl-btn.active { background: var(--neon); color: #051; }
 
