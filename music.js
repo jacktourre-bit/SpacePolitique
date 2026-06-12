@@ -304,6 +304,8 @@ const Music = (() => {
    * ---------------------------------------------------------------------- */
   function play(name) {
     if (!ensure()) return;
+    /* iOS/Android : le contexte audio peut être suspendu jusqu'à un geste */
+    if (ctx.state === "suspended") ctx.resume();
     if (themeName === name && timerId) return;
     theme = THEMES[name];
     themeName = name;

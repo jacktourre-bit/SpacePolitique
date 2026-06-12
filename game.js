@@ -1815,6 +1815,18 @@ function frame(ts) {
   requestAnimationFrame(frame);
 }
 
+/* La musique démarre automatiquement au tout premier geste (clic, touche,
+ * doigt) — les navigateurs interdisent l'audio avant une interaction. */
+function unlockAudio() {
+  AudioFX.ensure();
+  if (G.screen !== "playing") Music.play("title");
+}
+if (document.addEventListener) {
+  document.addEventListener("pointerdown", unlockAudio, { once: true });
+  document.addEventListener("keydown", unlockAudio, { once: true });
+  document.addEventListener("touchstart", unlockAudio, { once: true });
+}
+
 initBackground();
 showScreen("screen-title");
 requestAnimationFrame(frame);
