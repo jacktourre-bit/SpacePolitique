@@ -90,10 +90,12 @@ leaderboard-api.md  Plan de migration vers un leaderboard global (Supabase/REST)
 - **Armement évolutif** : jusqu'à **4 canons** (bonus C+, on en perd un par vie
   perdue), et changement de type de tir : **missiles fact-checkeurs** à tête
   chercheuse (MI) ou **laser transperçant** (LZ).
-- **LE GROS CALIBRE** 🍆 : une fois par épisode, une fusée rose au design,
-  disons, évocateur descend du ciel. Si tu l'attrapes : 6 secondes de feu
-  continu qui rase tout l'écran… mais **tout le jeu passe en vitesse ×2**,
-  ennemis et projectiles compris. Risque et récompense.
+- **LE GROS CALIBRE** 🍆 : **garanti une fois par épisode**. Une fusée rose
+  au design, disons, évocateur descend du ciel (avec son jingle) ; si tu la
+  rates, elle revient quelques secondes plus tard, et elle est forcée avant
+  le boss. Si tu l'attrapes : 6 secondes de feu continu qui rase tout
+  l'écran… mais **tout le jeu passe en vitesse ×2**, ennemis et projectiles
+  compris. Risque et récompense.
 - **Power-ups** : Esprit Critique (tir triple), Fact-check (purge l'écran),
   Débat Contradictoire (ralenti), Mémoire Historique (bouclier), Second Degré
   (−30 bourrage), Abstention Cosmique (intangible).
@@ -147,14 +149,21 @@ dans `style.css`.)
   durée de partie, signature locale des entrées. La vraie validation se fera côté
   serveur — voir [`leaderboard-api.md`](leaderboard-api.md).
 
-## 🎵 Musique 16-bit
+## 🎵 Musique 16-bit — un thème par famille politique
 
-Six thèmes chiptune générés en temps réel par `music.js` (aucun fichier audio) :
-menu, trois thèmes de niveau en rotation, boss, et boss final. Style SNES :
-lead à deux oscillateurs carrés désaccordés (chorus) + écho, basse triangle,
-batterie en bruit blanc filtré. Le **tempo suit l'accélérateur de rythme** du
-jeu et **double pendant le Gros Calibre**. Le bouton ♪ coupe musique et
-bruitages ; la pause met la musique en sourdine.
+Douze thèmes chiptune générés en temps réel par `music.js` (aucun fichier
+audio) : menus, **un thème par niveau selon la famille politique** —
+électro corporate pour la Start-up Nation, marche martiale pour la droite
+conservatrice, tension « breaking news » pour le plateau TV, punk 168 BPM
+pour la gauche radicale, hymne ouvrier pour la Cantine Rouge, groove
+nostalgique pour le Marais Socialiste, pentatonique aérienne pour la forêt
+écolo, synthwave pour les revenants — plus un thème de boss martelé et la
+**fanfare pompeuse du Sénat** (cuivres sawtooth, accords, timbales) pour
+Gérard Larcher. Style SNES : lead double oscillateur désaccordé + écho,
+basse triangle, batterie en bruit filtré. Le **tempo suit l'accélérateur de
+rythme** du jeu et **double pendant le Gros Calibre**, qui a aussi ses
+jingles d'apparition et de ramassage. Le bouton ♪ coupe tout ; la pause met
+la musique en sourdine.
 
 ## 🚀 Performance
 

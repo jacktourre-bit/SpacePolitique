@@ -41,6 +41,10 @@ const WEAPON_OFFSETS = [[0], [-9, 9], [-15, 0, 15], [-19, -7, 7, 19]];
 /* Accélérateur de rythme : +7% de vitesse globale par niveau */
 function paceMult() { return 1 + G.levelIndex * 0.07; }
 
+/* Thème musical de chaque niveau (voir music.js) */
+const LEVEL_THEMES = ["hall", "corporate", "conserva", "breaking", "punk",
+  "rouge", "rose", "forest", "retro", "final"];
+
 /* Les stratégies de trajectoire disponibles — tirées au sort à chaque run */
 const PATTERN_NAMES = ["sine", "zigzag", "swoop", "orbit", "steps", "dive"];
 const ENTRY_SIDES = ["left", "right", "top", "split"];
@@ -498,10 +502,11 @@ function beginLevel() {
   player.cooldown = 0; player.invuln = 1;
   player.triple = 0; player.slowField = 0; player.shield = 0; player.intangible = 0;
   player.touchTarget = null;
-  /* Le bonus spécial GROS CALIBRE tombe une fois par épisode,
-   * à un moment aléatoire du niveau */
-  G.specialTimer = rnd(8, 24);
+  /* Le bonus spécial GROS CALIBRE est GARANTI une fois par épisode :
+   * il tombe tôt, retombe s'il est raté, et est forcé avant le boss */
+  G.specialTimer = rnd(5, 14);
   G.specialDropped = false;
+  G.calibreCaught = false;
   spawnWave();
   showScreen(null);
   banner(["NIVEAU " + level.id, level.name], 2.2, "#7df0ff");
@@ -512,8 +517,8 @@ function beginLevel() {
     toast("GLISSE TON DOIGT POUR PILOTER — TIR AUTOMATIQUE", "#7df0ff", 4);
   }
   AudioFX.ensure();
-  /* Trois thèmes 16-bit qui tournent selon le niveau */
-  Music.play(["levelA", "levelB", "levelC"][G.levelIndex % 3]);
+  /* Un thème 16-bit par famille politique du niveau */
+  Music.play(LEVEL_THEMES[G.levelIndex] || "hall");
 }
 
 function onWaveCleared() {
@@ -525,6 +530,8 @@ function onWaveCleared() {
     G.flow = { state: "boss_incoming", timer: 2.0 };
     banner(["⚠ ALERTE BOSS ⚠"], 1.8, "#ff3355");
     AudioFX.alarm();
+    /* Si le Gros Calibre de l'épisode n'est pas encore tombé, on le force */
+    if (!G.specialDropped && !G.calibreCaught) G.specialTimer = 0.01;
   }
 }
 
@@ -702,9 +709,11 @@ function applyPowerup(p) {
       break;
     case "gros_calibre":
       player.calibre = 6;
+      G.calibreCaught = true;
       G.shake = 0.6;
       confettiBurst(player.x, player.y, 40);
       banner(["LE GROS CALIBRE !!!", "FEU CONTINU — TOUT VA 2× PLUS VITE"], 2.2, "#ffb0c8");
+      Music.stinger("calibre_catch");
       AudioFX.alarm();
       break;
   }
@@ -908,13 +917,14 @@ function update(dt) {
   G.time += dt;
   const level = LEVELS[G.levelIndex];
 
-  /* Largage du bonus spécial de l'épisode */
-  if (!G.specialDropped) {
+  /* Largage du bonus spécial de l'épisode (garanti tant qu'il n'est pas pris) */
+  if (!G.specialDropped && !G.calibreCaught) {
     G.specialTimer -= dt;
     if (G.specialTimer <= 0) {
       G.specialDropped = true;
-      powerups.push({ x: rnd(60, GAME_W - 60), y: -30, type: "gros_calibre", vy: 55, t: 0, special: true });
+      powerups.push({ x: rnd(60, GAME_W - 60), y: -30, type: "gros_calibre", vy: 45, t: 0, special: true });
       toast("⚠ LE GROS CALIBRE APPROCHE ⚠", "#ffb0c8", 2.5);
+      Music.stinger("calibre");
       AudioFX.powerup();
     }
   }
@@ -1145,6 +1155,14 @@ function update(dt) {
 
   /* --- Power-ups --- */
   for (const p of powerups) { p.t += dt; p.y += p.vy * dt; }
+  /* Gros Calibre raté ? Il reviendra : garanti une fois par épisode */
+  for (const p of powerups) {
+    if (p.type === "gros_calibre" && p.y >= GAME_H + 20 && !G.calibreCaught) {
+      G.specialDropped = false;
+      G.specialTimer = 7;
+      toast("LE GROS CALIBRE REVIENDRA...", "#ffb0c8", 1.8);
+    }
+  }
   powerups = powerups.filter(p => p.y < GAME_H + 20);
 
   /* --- Particules / textes --- */
