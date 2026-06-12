@@ -61,6 +61,7 @@ style.css        Style arcade rétro mobile-first + animations CSS des têtes
 characters.js    38 caricatures + 4 sbires fictifs : stats, palettes, répliques
 levels.js        Les 10 niveaux + phases du boss final
 leaderboard.js   Classement localStorage (global/mois/semaine/jour) + anti-triche MVP
+music.js         Musique chiptune 16-bit générée en WebAudio (6 thèmes, zéro fichier)
 game.js          Moteur : boucle 60 FPS, sprites procéduraux, patterns, boss, audio
 leaderboard-api.md  Plan de migration vers un leaderboard global (Supabase/REST)
 ```
@@ -146,6 +147,15 @@ dans `style.css`.)
   durée de partie, signature locale des entrées. La vraie validation se fera côté
   serveur — voir [`leaderboard-api.md`](leaderboard-api.md).
 
+## 🎵 Musique 16-bit
+
+Six thèmes chiptune générés en temps réel par `music.js` (aucun fichier audio) :
+menu, trois thèmes de niveau en rotation, boss, et boss final. Style SNES :
+lead à deux oscillateurs carrés désaccordés (chorus) + écho, basse triangle,
+batterie en bruit blanc filtré. Le **tempo suit l'accélérateur de rythme** du
+jeu et **double pendant le Gros Calibre**. Le bouton ♪ coupe musique et
+bruitages ; la pause met la musique en sourdine.
+
 ## 🚀 Performance
 
 - `requestAnimationFrame`, boucle à 60 FPS, `dt` plafonné.
@@ -156,6 +166,6 @@ dans `style.css`.)
 ## 🗺️ Roadmap
 
 - [ ] Leaderboard global (Supabase ou API REST — voir `leaderboard-api.md`)
-- [ ] Musique de fond 8-bit par niveau
+- [x] Musique de fond 16-bit (WebAudio, thèmes menu/niveaux/boss/boss final)
 - [ ] Mode "endless" post-victoire
 - [ ] Vibrations mobiles + meilleure gestion des très petits écrans

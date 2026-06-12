@@ -425,6 +425,7 @@ function spawnBosses() {
   });
   banner([level.bossTitle], 2.6, "#ff3355");
   AudioFX.alarm();
+  Music.play(G.levelIndex === LEVELS.length - 1 ? "final" : "boss");
 }
 
 function spawnMinion() {
@@ -482,6 +483,7 @@ function showLevelIntro() {
     card.appendChild(cv); card.appendChild(nameEl); card.appendChild(lineEl);
     cast.appendChild(card);
   }
+  Music.play("title");
   showScreen("screen-levelintro");
 }
 
@@ -510,6 +512,8 @@ function beginLevel() {
     toast("GLISSE TON DOIGT POUR PILOTER — TIR AUTOMATIQUE", "#7df0ff", 4);
   }
   AudioFX.ensure();
+  /* Trois thèmes 16-bit qui tournent selon le niveau */
+  Music.play(["levelA", "levelB", "levelC"][G.levelIndex % 3]);
 }
 
 function onWaveCleared() {
@@ -548,6 +552,7 @@ function nextLevelOrVictory() {
 
 function endRun(victory) {
   G.victory = victory;
+  Music.stop();
   const duration = Math.floor((Date.now() - G.startTime) / 1000);
   G.runDuration = duration;
   if (victory) {
@@ -1685,10 +1690,12 @@ canvas.addEventListener("pointercancel", () => { player.touchFiring = false; poi
 function togglePause() {
   if (G.screen !== "playing") return;
   G.paused = !G.paused;
+  Music.setPaused(G.paused);
   $("screen-pause").classList.toggle("hidden", !G.paused);
 }
 function toggleMute() {
   AudioFX.muted = !AudioFX.muted;
+  Music.setMuted(AudioFX.muted);
   $("btn-mute").textContent = AudioFX.muted ? "✕" : "♪";
   $("btn-mute").classList.toggle("active", AudioFX.muted);
 }
@@ -1740,7 +1747,7 @@ function saveScore(nameInputId) {
 }
 
 /* ============================ BRANCHEMENT DES BOUTONS ============================ */
-$("btn-start").addEventListener("click", () => { AudioFX.ensure(); showScreen("screen-difficulty"); });
+$("btn-start").addEventListener("click", () => { AudioFX.ensure(); Music.play("title"); showScreen("screen-difficulty"); });
 $("btn-leaderboard").addEventListener("click", () => showLeaderboard("global"));
 $("btn-credits").addEventListener("click", () => showScreen("screen-credits"));
 $("btn-credits-back").addEventListener("click", () => showScreen("screen-title"));
@@ -1755,6 +1762,8 @@ $("btn-go").addEventListener("click", () => beginLevel());
 $("btn-resume").addEventListener("click", () => togglePause());
 $("btn-quit").addEventListener("click", () => {
   G.paused = false;
+  Music.setPaused(false);
+  Music.play("title");
   $("screen-pause").classList.add("hidden");
   showScreen("screen-title");
 });
