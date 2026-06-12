@@ -25,8 +25,21 @@ const POWERUP_TYPES = {
   debat:           { sym: "DB", name: "DÉBAT CONTRADICTOIRE : RALENTI", color: "#b07df0" },
   memoire:         { sym: "MH", name: "MÉMOIRE HISTORIQUE : BOUCLIER", color: "#3ddc84" },
   second_degre:    { sym: "2°", name: "SECOND DEGRÉ : -30 BOURRAGE",  color: "#ff7eb6" },
-  abstention:      { sym: "Ab", name: "ABSTENTION COSMIQUE : INTANGIBLE", color: "#c0c0d0" }
+  abstention:      { sym: "Ab", name: "ABSTENTION COSMIQUE : INTANGIBLE", color: "#c0c0d0" },
+  /* Armement évolutif */
+  canon_plus:      { sym: "C+", name: "CANON SUPPLÉMENTAIRE !",       color: "#7dff7d" },
+  missiles:        { sym: "MI", name: "MISSILES FACT-CHECKEURS",      color: "#ff9f1c" },
+  pierce:          { sym: "LZ", name: "LASER TRANSPERÇANT",           color: "#ff5fff" },
+  /* Bonus spécial : 1 par épisode. Feu continu dévastateur, mais le jeu
+   * entier passe en vitesse ×2 pendant l'effet. */
+  gros_calibre:    { sym: "GC", name: "LE GROS CALIBRE : FEU CONTINU, VITESSE ×2 !", color: "#ffb0c8" }
 };
+
+/* Décalages des canons selon le niveau d'armement (1 à 4 canons) */
+const WEAPON_OFFSETS = [[0], [-9, 9], [-15, 0, 15], [-19, -7, 7, 19]];
+
+/* Accélérateur de rythme : +7% de vitesse globale par niveau */
+function paceMult() { return 1 + G.levelIndex * 0.07; }
 
 /* Les stratégies de trajectoire disponibles — tirées au sort à chaque run */
 const PATTERN_NAMES = ["sine", "zigzag", "swoop", "orbit", "steps", "dive"];
@@ -275,6 +288,9 @@ const player = {
   cooldown: 0,
   invuln: 0,
   triple: 0, slowField: 0, shield: 0, intangible: 0,
+  weaponLevel: 1,          // nombre de canons (1 à 4)
+  weaponType: "laser",     // laser | missiles | pierce
+  calibre: 0,              // timer du GROS CALIBRE (feu continu + jeu ×2)
   touchTarget: null, touchFiring: false
 };
 
@@ -384,7 +400,7 @@ function makeEnemy(charId, slotX, slotY, isBoss, bossHp) {
     phase: rnd(0, Math.PI * 2),
     fireMode: wavePlan.fireMode,
     fireTimer: rnd(1.0, 3.0),
-    speed: ch.speed * wavePlan.speedJitter * G.diff.speed,
+    speed: ch.speed * wavePlan.speedJitter * G.diff.speed * paceMult(),
     state: "idle", stateTimer: 0,
     diveTimer: runRng() < wavePlan.kamikazeChance ? rnd(3, 9) : Infinity,
     diving: false, diveT: 0, diveTx: 0, diveTy: 0,
@@ -439,6 +455,7 @@ function startRun(diffKey) {
   G.influences = {}; G.combo = 0; G.comboTimer = 0; G.dodgeTimer = 0;
   G.defeatedBosses = []; G.victory = false;
   G.startTime = Date.now();
+  player.weaponLevel = 1; player.weaponType = "laser"; player.calibre = 0;
   showLevelIntro();
 }
 
@@ -479,9 +496,16 @@ function beginLevel() {
   player.cooldown = 0; player.invuln = 1;
   player.triple = 0; player.slowField = 0; player.shield = 0; player.intangible = 0;
   player.touchTarget = null;
+  /* Le bonus spécial GROS CALIBRE tombe une fois par épisode,
+   * à un moment aléatoire du niveau */
+  G.specialTimer = rnd(8, 24);
+  G.specialDropped = false;
   spawnWave();
   showScreen(null);
   banner(["NIVEAU " + level.id, level.name], 2.2, "#7df0ff");
+  if (G.levelIndex > 0) {
+    toast("RYTHME +" + Math.round((paceMult() - 1) * 100) + "% !", "#ff9f1c", 2.2);
+  }
   if (IS_TOUCH && G.levelIndex === 0) {
     toast("GLISSE TON DOIGT POUR PILOTER — TIR AUTOMATIQUE", "#7df0ff", 4);
   }
@@ -631,8 +655,12 @@ function deprogram(e, giveScore) {
 }
 
 function dropPowerup(x, y) {
-  const keys = Object.keys(POWERUP_TYPES);
-  const type = keys[Math.floor(runRng() * keys.length)];
+  /* Tirage pondéré : les canons supplémentaires tombent plus souvent.
+   * Le GROS CALIBRE n'est PAS dans ce tirage : il arrive une fois par
+   * épisode, programmé par beginLevel(). */
+  const pool = ["canon_plus", "canon_plus", "missiles", "pierce",
+    "esprit_critique", "factcheck", "debat", "memoire", "second_degre", "abstention"];
+  const type = pool[Math.floor(runRng() * pool.length)];
   powerups.push({ x, y, type, vy: 70, t: 0 });
 }
 
@@ -652,7 +680,66 @@ function applyPowerup(p) {
       G.bourrage = Math.max(0, G.bourrage - 30);
       break;
     case "abstention": player.intangible = 4; break;
+    case "canon_plus":
+      if (player.weaponLevel < 4) {
+        player.weaponLevel++;
+        floatText(player.x, player.y - 45, player.weaponLevel + " CANONS !", "#7dff7d", 14);
+      } else {
+        G.score += 200;
+        floatText(player.x, player.y - 45, "CANONS MAX +200", "#7dff7d", 12);
+      }
+      break;
+    case "missiles":
+      player.weaponType = "missiles";
+      break;
+    case "pierce":
+      player.weaponType = "pierce";
+      break;
+    case "gros_calibre":
+      player.calibre = 6;
+      G.shake = 0.6;
+      confettiBurst(player.x, player.y, 40);
+      banner(["LE GROS CALIBRE !!!", "FEU CONTINU — TOUT VA 2× PLUS VITE"], 2.2, "#ffb0c8");
+      AudioFX.alarm();
+      break;
   }
+}
+
+/* ============================ ARMEMENT DU JOUEUR ============================ */
+function fireWeapon() {
+  const offs = WEAPON_OFFSETS[Math.min(WEAPON_OFFSETS.length - 1, player.weaponLevel - 1)];
+  switch (player.weaponType) {
+    case "missiles":
+      player.cooldown = 0.34;
+      for (const o of offs) {
+        bullets.push({ x: player.x + o, y: player.y - 14, vx: o * 6, vy: -340,
+          homing: true, dmg: 2, life: 3, kind: "missile" });
+      }
+      AudioFX.tone(300, 0.12, "sawtooth", 0.04, -120);
+      break;
+    case "pierce":
+      player.cooldown = 0.3;
+      for (const o of offs) {
+        bullets.push({ x: player.x + o, y: player.y - 16, vx: 0, vy: -400,
+          pierce: 2, dmg: 1, kind: "pierce" });
+      }
+      AudioFX.tone(1200, 0.08, "square", 0.03, -700);
+      break;
+    default: /* laser */
+      player.cooldown = 0.22;
+      for (const o of offs) {
+        bullets.push({ x: player.x + o, y: player.y - 16, vx: 0, vy: -460,
+          dmg: 1, kind: "laser" });
+      }
+      AudioFX.shoot();
+  }
+  /* Esprit Critique : 2 tirs obliques en plus, quel que soit le canon */
+  if (player.triple > 0) {
+    bullets.push({ x: player.x, y: player.y - 16, vx: Math.sin(-0.25) * 460, vy: -Math.cos(0.25) * 460, dmg: 1, kind: "laser" });
+    bullets.push({ x: player.x, y: player.y - 16, vx: Math.sin(0.25) * 460, vy: -Math.cos(0.25) * 460, dmg: 1, kind: "laser" });
+  }
+  /* Flash de départ sur chaque canon */
+  for (const o of offs) burst(player.x + o, player.y - 18, "#9ff5ff", 2, 60);
 }
 
 /* ============================ DÉGÂTS AU JOUEUR ============================ */
@@ -683,6 +770,7 @@ function hitPlayerWithBody(e) {
     return;
   }
   G.lives--;
+  player.weaponLevel = Math.max(1, player.weaponLevel - 1); // on perd un canon
   G.bourrage = Math.min(100, G.bourrage + 15 * G.diff.bourrage);
   addInfluence(e.ch.family, e.ch.influenceValue);
   G.dodgeTimer = 0; G.bourrageFlash = 0.5;
@@ -700,16 +788,26 @@ function addInfluence(family, amount) {
 }
 
 /* ============================ TIR ENNEMI ============================ */
+/* Choisit la phrase projetée : punchline du personnage (75%) ou
+ * vocabulaire d'ambiance du niveau (25%) */
+function pickWord(e) {
+  const level = LEVELS[G.levelIndex];
+  const pl = e.ch.punchlines;
+  if (pl && pl.length && runRng() < 0.75) return pl[Math.floor(runRng() * pl.length)];
+  return level.wordPool[Math.floor(runRng() * level.wordPool.length)];
+}
+
 function enemyFire(e) {
   const level = LEVELS[G.levelIndex];
-  const word = level.wordPool[Math.floor(runRng() * level.wordPool.length)];
+  const word = pickWord(e);
   const fam = e.ch.family;
   const col = (FAMILY_INFO[fam] || {}).color || "#fff";
-  let baseSpeed = 150 * G.diff.fire * (level.mechanics.includes("fast_shots") ? 1.4 : 1);
+  let baseSpeed = 150 * G.diff.fire * paceMult() * (level.mechanics.includes("fast_shots") ? 1.4 : 1);
   if (player.slowField > 0) baseSpeed *= 0.5;
   e.state = "talk"; e.stateTimer = 0.4;
+  burst(e.x, e.y + e.r * 0.5, col, 4, 80); // flash de bouche
 
-  const mk = (vx, vy) => shots.push({ x: e.x, y: e.y + e.r * 0.6, vx, vy, word, family: fam, color: col, src: e.ch, r: 9 });
+  const mk = (vx, vy) => shots.push({ x: e.x, y: e.y + e.r * 0.6, vx, vy, word, family: fam, color: col, src: e.ch, r: 9, t: 0 });
   const aim = () => {
     const dx = player.x - e.x, dy = player.y - e.y;
     const d = Math.hypot(dx, dy) || 1;
@@ -739,11 +837,12 @@ function bossFire(e) {
       AudioFX.alarm();
     }
   }
-  const word = level.wordPool[Math.floor(runRng() * level.wordPool.length)];
+  const word = pickWord(e);
   const col = (FAMILY_INFO[e.ch.family] || {}).color || "#fff";
-  let sp = 160 * G.diff.fire;
+  let sp = 160 * G.diff.fire * paceMult();
   if (player.slowField > 0) sp *= 0.5;
-  const mk = (vx, vy) => shots.push({ x: e.x, y: e.y + e.r * 0.7, vx, vy, word, family: e.ch.family, color: col, src: e.ch, r: 9 });
+  burst(e.x, e.y + e.r * 0.5, col, 6, 110); // flash de bouche du boss
+  const mk = (vx, vy) => shots.push({ x: e.x, y: e.y + e.r * 0.7, vx, vy, word, family: e.ch.family, color: col, src: e.ch, r: 9, t: 0 });
   const aimAt = (spread) => {
     const dx = player.x - e.x, dy = player.y - e.y;
     const base = Math.atan2(dy, dx);
@@ -774,10 +873,13 @@ function larcherLogic(e) {
     2: ["PROTOCOLE", "SYSTÈME", "RÉSEAU"],
     3: ["DISCOURS", "SATURATION", "MOTION FINALE"]
   }[phase];
-  const word = words[Math.floor(runRng() * words.length)];
-  let sp = 150 * G.diff.fire;
+  const word = (e.ch.punchlines.length && runRng() < 0.3)
+    ? e.ch.punchlines[Math.floor(runRng() * e.ch.punchlines.length)]
+    : words[Math.floor(runRng() * words.length)];
+  let sp = 150 * G.diff.fire * paceMult();
   if (player.slowField > 0) sp *= 0.5;
-  const mk = (vx, vy) => shots.push({ x: e.x + rnd(-60, 60), y: e.y + 70, vx, vy, word, family: e.ch.family, color: "#c8a040", src: e.ch, r: 10 });
+  burst(e.x + rnd(-50, 50), e.y + 60, "#c8a040", 6, 110);
+  const mk = (vx, vy) => shots.push({ x: e.x + rnd(-60, 60), y: e.y + 70, vx, vy, word, family: e.ch.family, color: "#c8a040", src: e.ch, r: 10, t: 0 });
   const aim = (spread) => {
     const dx = player.x - e.x, dy = player.y - e.y;
     const base = Math.atan2(dy, dx);
@@ -792,8 +894,25 @@ function larcherLogic(e) {
 
 /* ============================ MISE À JOUR ============================ */
 function update(dt) {
+  /* GROS CALIBRE actif : le timer s'écoule en temps réel,
+   * mais TOUT LE JEU tourne en vitesse ×2 */
+  if (player.calibre > 0) {
+    player.calibre -= dt;
+    dt *= 2;
+  }
   G.time += dt;
   const level = LEVELS[G.levelIndex];
+
+  /* Largage du bonus spécial de l'épisode */
+  if (!G.specialDropped) {
+    G.specialTimer -= dt;
+    if (G.specialTimer <= 0) {
+      G.specialDropped = true;
+      powerups.push({ x: rnd(60, GAME_W - 60), y: -30, type: "gros_calibre", vy: 55, t: 0, special: true });
+      toast("⚠ LE GROS CALIBRE APPROCHE ⚠", "#ffb0c8", 2.5);
+      AudioFX.powerup();
+    }
+  }
 
   /* --- Timers globaux --- */
   if (G.banner) { G.banner.t += dt; if (G.banner.t > G.banner.dur) G.banner = null; }
@@ -840,14 +959,18 @@ function update(dt) {
   player.y = Math.max(GAME_H * 0.45, Math.min(GAME_H - 30, player.y));
 
   /* --- Tir joueur --- */
-  const wantFire = Input.fire || G.autoFire || player.touchFiring;
-  if (wantFire && player.cooldown <= 0) {
-    player.cooldown = 0.22;
-    const mk = (a) => bullets.push({ x: player.x, y: player.y - 18,
-      vx: Math.sin(a) * 460, vy: -Math.cos(a) * 460 });
-    mk(0);
-    if (player.triple > 0) { mk(-0.22); mk(0.22); }
-    AudioFX.shoot();
+  if (player.calibre > 0) {
+    /* FEU CONTINU : méga-rafales qui transpercent tout */
+    if (player.cooldown <= 0) {
+      player.cooldown = 0.07;
+      bullets.push({ x: player.x, y: player.y - 20, vx: 0, vy: -720,
+        dmg: 5, pierce: 99, kind: "mega" });
+      burst(player.x, player.y - 22, "#ffb0c8", 3, 90);
+      AudioFX.tone(160 + Math.random() * 80, 0.08, "sawtooth", 0.05, -60);
+    }
+  } else {
+    const wantFire = Input.fire || G.autoFire || player.touchFiring;
+    if (wantFire && player.cooldown <= 0) fireWeapon();
   }
 
   /* --- File de spawn --- */
@@ -950,7 +1073,7 @@ function update(dt) {
     /* Tir */
     e.fireTimer -= dt * slowMult;
     if (e.fireTimer <= 0 && e.entryT >= 1) {
-      e.fireTimer = (e.isBoss ? rnd(0.8, 1.4) : rnd(1.8, 4.0)) / (G.diff.fire * level.fireRateMult);
+      e.fireTimer = (e.isBoss ? rnd(0.8, 1.4) : rnd(1.8, 4.0)) / (G.diff.fire * level.fireRateMult * paceMult());
       if (e.isBoss) bossFire(e); else enemyFire(e);
     }
 
@@ -978,12 +1101,41 @@ function update(dt) {
   for (const cr of crystals) cr.t += dt;
 
   /* --- Balles du joueur --- */
-  for (const b of bullets) { b.x += b.vx * dt; b.y += b.vy * dt; }
-  bullets = bullets.filter(b => b.y > -20 && b.x > -20 && b.x < GAME_W + 20);
+  for (const b of bullets) {
+    if (b.homing) {
+      /* Missile fact-checkeur : vise l'ennemi (ou le cristal) le plus proche */
+      let best = null, bd = Infinity;
+      for (const e of enemies) {
+        const d = (e.x - b.x) ** 2 + (e.y - b.y) ** 2;
+        if (d < bd) { bd = d; best = e; }
+      }
+      if (!best) for (const cr of crystals) {
+        const d = (cr.x - b.x) ** 2 + (cr.y - b.y) ** 2;
+        if (d < bd) { bd = d; best = cr; }
+      }
+      if (best) {
+        const want = Math.atan2(best.y - b.y, best.x - b.x);
+        const cur = Math.atan2(b.vy, b.vx);
+        let diff = want - cur;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        const maxTurn = 5 * dt;
+        const ang = cur + Math.max(-maxTurn, Math.min(maxTurn, diff));
+        const sp = Math.hypot(b.vx, b.vy);
+        b.vx = Math.cos(ang) * sp; b.vy = Math.sin(ang) * sp;
+      }
+      if (b.life !== undefined) { b.life -= dt; if (b.life <= 0) b.dead = true; }
+      /* Traînée de fumée */
+      if (Math.random() < 0.6) particles.push({ x: b.x, y: b.y, vx: 0, vy: 40,
+        t: 0, dur: 0.3, color: "#ff9f1c", size: 2 });
+    }
+    b.x += b.vx * dt; b.y += b.vy * dt;
+  }
+  bullets = bullets.filter(b => !b.dead && b.y > -30 && b.y < GAME_H + 30 && b.x > -30 && b.x < GAME_W + 30);
 
   /* --- Projectiles ennemis --- */
   const shotSlow = player.slowField > 0 ? 0.5 : 1;
-  for (const s of shots) { s.x += s.vx * dt * shotSlow; s.y += s.vy * dt * shotSlow; }
+  for (const s of shots) { s.t += dt; s.x += s.vx * dt * shotSlow; s.y += s.vy * dt * shotSlow; }
   shots = shots.filter(s => s.y < GAME_H + 30 && s.y > -30 && s.x > -60 && s.x < GAME_W + 60);
 
   /* --- Power-ups --- */
@@ -1003,21 +1155,23 @@ function update(dt) {
   for (const b of bullets) {
     let consumed = false;
     for (const e of enemies) {
+      if (b.hitSet && b.hitSet.indexOf(e) >= 0) continue; // déjà transpercé
       const dx = b.x - e.x, dy = b.y - e.y;
       if (dx * dx + dy * dy < e.r * e.r) {
-        e.hp--;
+        e.hp -= (b.dmg || 1);
         if (e.state !== "attack") { e.state = "hit"; e.stateTimer = 0.15; }
-        burst(b.x, b.y, "#7df0ff", 3, 90);
+        const impactCol = b.kind === "mega" ? "#ffb0c8" : b.kind === "pierce" ? "#ff5fff" : "#7df0ff";
+        burst(b.x, b.y, impactCol, b.kind === "mega" ? 8 : 3, b.kind === "mega" ? 160 : 90);
         AudioFX.enemyHit();
-        consumed = true;
         if (e.hp <= 0) {
-          if (e.isBoss) {
-            deprogram(e, true);
-            G.score += 0; // le scoreValue du boss est déjà compté dans deprogram
-            if (!enemies.some(x => x.isBoss)) onBossesDefeated();
-          } else {
-            deprogram(e, true);
-          }
+          deprogram(e, true);
+          if (e.isBoss && !enemies.some(x => x.isBoss)) onBossesDefeated();
+        }
+        if (b.pierce && b.pierce > 0) {
+          b.pierce--;
+          (b.hitSet = b.hitSet || []).push(e);
+        } else {
+          consumed = true;
         }
         break;
       }
@@ -1026,10 +1180,10 @@ function update(dt) {
       for (const cr of crystals) {
         const dx = b.x - cr.x, dy = b.y - cr.y;
         if (dx * dx + dy * dy < cr.r * cr.r) {
-          cr.hp--;
+          cr.hp -= (b.dmg || 1);
           burst(b.x, b.y, "#c8a040", 3, 90);
           AudioFX.enemyHit();
-          consumed = true;
+          if (!(b.pierce && b.pierce-- > 0)) consumed = true;
           if (cr.hp <= 0) {
             crystals.splice(crystals.indexOf(cr), 1);
             burst(cr.x, cr.y, "#c8a040", 16, 160);
@@ -1197,6 +1351,18 @@ function render() {
     ctx.fillRect(0, 0, GAME_W, GAME_H);
   }
 
+  /* Mode GROS CALIBRE : bords roses pulsants + compteur */
+  if (player.calibre > 0 && G.screen === "playing") {
+    const a = 0.12 + Math.sin(G.time * 10) * 0.06;
+    ctx.fillStyle = "rgba(255,126,182," + a + ")";
+    ctx.fillRect(0, 0, GAME_W, 8); ctx.fillRect(0, GAME_H - 8, GAME_W, 8);
+    ctx.fillRect(0, 0, 8, GAME_H); ctx.fillRect(GAME_W - 8, 0, 8, GAME_H);
+    ctx.fillStyle = "#ffb0c8";
+    ctx.font = "bold 13px 'Courier New', monospace";
+    ctx.textAlign = "center";
+    ctx.fillText("GROS CALIBRE ×2 — " + player.calibre.toFixed(1) + "s", GAME_W / 2, GAME_H - 16);
+  }
+
   /* Flash de bourrage */
   if (G.bourrageFlash > 0) {
     ctx.fillStyle = "rgba(255,45,122," + (G.bourrageFlash * 0.5) + ")";
@@ -1269,21 +1435,60 @@ function drawEnemies() {
 function drawShots() {
   ctx.textAlign = "center";
   for (const s of shots) {
+    /* Traînée lumineuse derrière le projectile */
+    ctx.globalAlpha = 0.18;
     ctx.fillStyle = s.color;
+    ctx.beginPath(); ctx.arc(s.x - s.vx * 0.03, s.y - s.vy * 0.03, 5, 0, 7); ctx.fill();
+    ctx.globalAlpha = 0.08;
+    ctx.beginPath(); ctx.arc(s.x - s.vx * 0.06, s.y - s.vy * 0.06, 6, 0, 7); ctx.fill();
+    /* Halo + noyau */
+    ctx.globalAlpha = 0.25;
+    ctx.beginPath(); ctx.arc(s.x, s.y, 9, 0, 7); ctx.fill();
+    ctx.globalAlpha = 1;
     ctx.beginPath(); ctx.arc(s.x, s.y, 4, 0, 7); ctx.fill();
-    ctx.globalAlpha = 0.85;
-    ctx.font = "bold 9px 'Courier New', monospace";
-    ctx.fillText(s.word, s.x, s.y - 8);
+    /* La punchline "pop" : grosse au départ, puis se stabilise */
+    const popSize = 9 + Math.max(0, 0.3 - (s.t || 0)) * 26;
+    ctx.globalAlpha = 0.9;
+    ctx.font = "bold " + popSize.toFixed(0) + "px 'Courier New', monospace";
+    ctx.fillText(s.word, s.x, s.y - 9);
     ctx.globalAlpha = 1;
   }
 }
 
 function drawBullets() {
   for (const b of bullets) {
-    ctx.fillStyle = "#7df0ff";
-    ctx.fillRect(b.x - 2, b.y - 7, 4, 12);
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(b.x - 1, b.y - 5, 2, 5);
+    switch (b.kind) {
+      case "mega": /* GROS CALIBRE : grosse salve rose qui rase tout */
+        ctx.globalAlpha = 0.3;
+        ctx.fillStyle = "#ffb0c8";
+        ctx.fillRect(b.x - 9, b.y - 18, 18, 34);
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = "#ff7eb6";
+        ctx.fillRect(b.x - 5, b.y - 14, 10, 26);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(b.x - 2, b.y - 10, 4, 16);
+        break;
+      case "missile":
+        ctx.fillStyle = "#ffd166";
+        ctx.fillRect(b.x - 3, b.y - 8, 6, 12);
+        ctx.fillStyle = "#ff9f1c";
+        ctx.fillRect(b.x - 2, b.y + 4, 4, 5 + Math.random() * 4);
+        break;
+      case "pierce":
+        ctx.globalAlpha = 0.35;
+        ctx.fillStyle = "#ff5fff";
+        ctx.fillRect(b.x - 4, b.y - 14, 8, 24);
+        ctx.globalAlpha = 1;
+        ctx.fillRect(b.x - 2, b.y - 11, 4, 18);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(b.x - 1, b.y - 8, 2, 12);
+        break;
+      default: /* laser */
+        ctx.fillStyle = "#7df0ff";
+        ctx.fillRect(b.x - 2, b.y - 7, 4, 12);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(b.x - 1, b.y - 5, 2, 5);
+    }
   }
 }
 
@@ -1291,6 +1496,39 @@ function drawPowerups() {
   for (const p of powerups) {
     const def = POWERUP_TYPES[p.type];
     const bob = Math.sin(p.t * 5) * 3;
+
+    if (p.type === "gros_calibre") {
+      /* LE GROS CALIBRE : fusée phallique pixel-art assumée, rose bonbon,
+       * qui descend majestueusement avec son halo. Cartoon, zéro réalisme. */
+      const x = p.x, y = p.y + bob;
+      ctx.globalAlpha = 0.25 + Math.sin(p.t * 7) * 0.1;
+      ctx.fillStyle = "#ffb0c8";
+      ctx.beginPath(); ctx.arc(x, y, 30, 0, 7); ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = "#ff9ec4";
+      ctx.fillRect(x - 6, y - 20, 12, 30);            // le fût
+      ctx.beginPath(); ctx.arc(x, y - 20, 7, Math.PI, 0); ctx.fill(); // l'ogive arrondie
+      ctx.beginPath(); ctx.arc(x - 9, y + 12, 7, 0, 7); ctx.fill();   // réservoir gauche
+      ctx.beginPath(); ctx.arc(x + 9, y + 12, 7, 0, 7); ctx.fill();   // réservoir droit
+      ctx.fillStyle = "#ff7eb6";
+      ctx.fillRect(x - 6, y - 4, 12, 3);              // liseré décoratif
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(x - 2, y - 24, 2, 4);              // reflet cartoon
+      /* Étincelles d'escorte */
+      if (Math.random() < 0.4) particles.push({ x: x + rnd(-18, 18), y: y + rnd(-22, 18),
+        vx: 0, vy: -20, t: 0, dur: 0.4, color: "#ffd9e8", size: 2 });
+      ctx.fillStyle = "#ffb0c8";
+      ctx.font = "bold 9px 'Courier New', monospace";
+      ctx.textAlign = "center";
+      ctx.fillText("GROS CALIBRE", x, y + 32);
+      continue;
+    }
+
+    /* Halo pulsant pour tous les bonus */
+    ctx.globalAlpha = 0.18 + Math.sin(p.t * 6) * 0.08;
+    ctx.fillStyle = def.color;
+    ctx.beginPath(); ctx.arc(p.x, p.y + bob, 19, 0, 7); ctx.fill();
+    ctx.globalAlpha = 1;
     ctx.fillStyle = "rgba(5,5,25,0.8)";
     ctx.fillRect(p.x - 12, p.y - 12 + bob, 24, 24);
     ctx.strokeStyle = def.color; ctx.lineWidth = 2;
@@ -1338,6 +1576,21 @@ function drawPlayer() {
   ctx.fillStyle = "#45c8e8";
   ctx.fillRect(px - 14, py + 2, 28, 10);
   ctx.fillRect(px - 18, py + 6, 36, 6);
+
+  /* Les canons visibles (1 à 4 selon le niveau d'armement) */
+  const offs = WEAPON_OFFSETS[Math.min(WEAPON_OFFSETS.length - 1, player.weaponLevel - 1)];
+  const cannonCol = player.weaponType === "missiles" ? "#ff9f1c"
+    : player.weaponType === "pierce" ? "#ff5fff" : "#9ff5ff";
+  ctx.fillStyle = cannonCol;
+  for (const o of offs) ctx.fillRect(px + o - 2, py - 16, 4, 8);
+
+  /* Aura du GROS CALIBRE : le vaisseau irradie de rose */
+  if (player.calibre > 0) {
+    ctx.globalAlpha = 0.3 + Math.sin(G.time * 14) * 0.15;
+    ctx.fillStyle = "#ffb0c8";
+    ctx.beginPath(); ctx.arc(px, py, 30, 0, 7); ctx.fill();
+    ctx.globalAlpha = player.intangible > 0 ? 0.45 : 1;
+  }
   /* Dôme */
   ctx.fillStyle = "#9ff5ff";
   ctx.beginPath(); ctx.arc(px, py - 2, 11, Math.PI, 0); ctx.fill();

@@ -521,53 +521,53 @@ const CHARACTERS = [
     spriteFrames: null
   },
 
-  /* ============== SBIRES GÉNÉRIQUES (chair à canon fictive) ============== */
+  /* ============== SBIRES MÉDIATIQUES (vrais noms détournés) ============== */
   {
-    id: "editorialiste", displayName: "Éditorialiste Clone", realReference: "Personnage fictif",
+    id: "editorialiste", displayName: "Pascal Pravda", realReference: "Pascal Praud (parodie)",
     family: "populisme_mediatique", enemyType: "petit",
     hp: 2, speed: 1.3, scoreValue: 10, influenceValue: 5,
     colorPalette: { skin: "#e8c0a0", hair: "#777788", suit: "#444455", accent: "#ff9f1c" },
     features: { hair: "slick", glasses: true, beard: false, mustache: false, accessory: "mic", brows: "high" },
-    caricatureNotes: "Clone produit en série dans les sous-sols des chaînes d'info. Indigné par défaut.",
-    introLine: "Alors moi, ce que je dis, c'est que...",
+    caricatureNotes: "Éditorialiste survolté cloné en série dans les sous-sols des chaînes d'info. S'indigne à la vitesse de la lumière.",
+    introLine: "Et vous savez ce qu'on me dit dans l'oreillette ?",
     attackLine: "C'est un scandale ! (lequel ? aucune idée)",
     defeatLine: "On en reparle après la pub.",
     spriteFrames: null
   },
   {
-    id: "sondeur", displayName: "Sondeur Sauvage", realReference: "Personnage fictif",
+    id: "sondeur", displayName: "Jérôme Fourquetout", realReference: "Jérôme Fourquet (parodie)",
     family: "apparatchik_local", enemyType: "petit",
     hp: 2, speed: 1.1, scoreValue: 10, influenceValue: 4,
     colorPalette: { skin: "#ecc8a8", hair: "#5a5a66", suit: "#2f3e4e", accent: "#80d8ff" },
     features: { hair: "crew", glasses: true, beard: false, mustache: false, accessory: "badge", brows: "flat" },
-    caricatureNotes: "Lance des camemberts statistiques à 2% de marge d'erreur (au moins).",
+    caricatureNotes: "Sondologue cosmique : lance des camemberts statistiques à ±12% de marge d'erreur, archipellise tout ce qu'il touche.",
     introLine: "67% de ton cerveau est déjà d'accord avec moi.",
     attackLine: "Échantillon représentatif !",
     defeatLine: "Marge d'erreur dépassée...",
     spriteFrames: null
   },
   {
-    id: "communicant", displayName: "Communicant Spectral", realReference: "Personnage fictif",
-    family: "centre_technocratique", enemyType: "petit",
+    id: "communicant", displayName: "Cyril Hanounova", realReference: "Cyril Hanouna (parodie)",
+    family: "populisme_mediatique", enemyType: "petit",
     hp: 3, speed: 1.2, scoreValue: 10, influenceValue: 5,
     colorPalette: { skin: "#e6c2a4", hair: "#3a3a44", suit: "#555570", accent: "#caffff" },
-    features: { hair: "slick", glasses: false, beard: false, mustache: false, accessory: "tie", brows: "high" },
-    caricatureNotes: "Mi-humain mi-PowerPoint, laisse une traînée de slides derrière lui.",
-    introLine: "J'ai préparé 240 slides sur ta défaite.",
-    attackLine: "Slide suivante !",
-    defeatLine: "La slide 241 prévoyait pourtant tout...",
+    features: { hair: "slick", glasses: false, beard: false, mustache: false, accessory: "mic", brows: "high" },
+    caricatureNotes: "Mi-animateur mi-supernova, transforme chaque débat galactique en jeu télé, laisse une traînée de confettis et de sonneries.",
+    introLine: "C'est que du live, chéri !",
+    attackLine: "Darka intersidéral !",
+    defeatLine: "Coupez pas mon émission !!",
     spriteFrames: null
   },
   {
-    id: "militant", displayName: "Militant Pixelisé", realReference: "Personnage fictif",
+    id: "militant", displayName: "Lassalle l'Errant", realReference: "Jean Lassalle (parodie)",
     family: "apparatchik_local", enemyType: "petit",
     hp: 2, speed: 1.4, scoreValue: 10, influenceValue: 4,
     colorPalette: { skin: "#ecc6a6", hair: "#6a4a30", suit: "#666644", accent: "#ffe080" },
     features: { hair: "spiky", glasses: false, beard: false, mustache: false, accessory: "badge", brows: "high" },
-    caricatureNotes: "Distribue des tracts plus vite que son ombre, colle des affiches sur les astéroïdes.",
-    introLine: "Un tract ? Un tract ! UN TRACT !",
-    attackLine: "Collage nocturne intergalactique !",
-    defeatLine: "Mes tracts... envolés dans le cosmos...",
+    caricatureNotes: "Berger cosmique égaré loin de sa vallée, traverse la galaxie à pied en chantant et distribue de la ruralité pixelisée.",
+    introLine: "Oh !... La belle galaxie que voilà.",
+    attackLine: "Vive la montagne !",
+    defeatLine: "Je rentre dans ma vallée...",
     spriteFrames: null
   }
 ];
@@ -575,3 +575,56 @@ const CHARACTERS = [
 /* Index par id pour un accès rapide */
 const CHARACTERS_BY_ID = {};
 for (const c of CHARACTERS) CHARACTERS_BY_ID[c.id] = c;
+
+/* -------------------------------------------------------------------------
+ * PUNCHLINES D'ATTAQUE — projectiles verbaux de chaque personnage.
+ * Mélange de citations publiques célèbres (notoires et documentées),
+ * de slogans de campagne et de titres d'œuvres réels, complétés par des
+ * phrases stylisées satiriques pour les personnages moins quotables.
+ * Utilisées comme projectiles par le moteur (game.js).
+ * ------------------------------------------------------------------------- */
+const PUNCHLINES = {
+  macron:       ["QU'ILS VIENNENT ME CHERCHER", "TRAVERSE LA RUE !", "EN MÊME TEMPS", "POGNON DE DINGUE", "GAULOIS RÉFRACTAIRES"],
+  philippe:     ["DES HOMMES QUI LISENT", "DES JOURS HEUREUX", "JE RESTE CALME"],
+  attal:        ["J'ASSUME TOTALEMENT", "PUNCHLINE EXPRESS", "DÉJÀ VIRAL"],
+  borne:        ["49.3 !", "ARTICLE 49.3 !", "DOSSIER SUIVANT"],
+  darmanin:     ["VOUS ÊTES TROP MOLLE !", "CONTRÔLE D'IDENTITÉ", "FERMETÉ RÉPUBLICAINE"],
+  bayrou:       ["JE SUIS LÀ DEPUIS 1974", "LE CENTRE, TOUJOURS", "HAUT-COMMISSAIRE AU PLAN"],
+  braun_pivet:  ["LA SÉANCE EST OUVERTE", "UN PEU DE SILENCE !", "JE LÈVE LA SÉANCE"],
+  lemaire:      ["LA CROISSANCE REVIENDRA", "CHAPITRE 14 : LE DÉFICIT", "FLAUBERT FISCAL"],
+  pecresse:     ["JE RESSORS LE KÄRCHER", "JE SUIS UNE FEMME LIBRE", "LE TABLEUR A PARLÉ"],
+  bertrand:     ["LE TERRAIN, LE VRAI", "LES HAUTS-DE-FRANCE D'ABORD", "MOI, JE FAIS"],
+  ciotti:       ["TOUJOURS PLUS À DROITE", "VIRAGE SANS CLIGNOTANT", "L'ALLIANCE, C'EST MOI"],
+  wauquiez:     ["LA DOUDOUNE NE MENT PAS", "PARLER VRAI", "REPLI SUR L'ARDÈCHE"],
+  retailleau:   ["RÉTABLIR L'ORDRE", "LA FRANCE DES CLOCHERS", "C'ÉTAIT MIEUX AVANT"],
+  dati:         ["PAS DE LEÇONS À RECEVOIR", "JE TRAVERSE TOUT", "COMÈTE DU 7E"],
+  sarkozy:      ["CASSE-TOI PAUV' CON", "TRAVAILLER PLUS POUR GAGNER PLUS", "LE RETOUR, ENCORE"],
+  fillon:       ["DE GAULLE MIS EN EXAMEN ?", "RIGUEUR !", "JE DEMANDE PARDON"],
+  lepen:        ["AU NOM DU PEUPLE", "LA FRANCE APAISÉE", "ON N'A PAS PERDU, PRESQUE"],
+  bardella:     ["CE QUE JE CHERCHE", "GÉNÉRATION BARDELLA", "STORY SPONSORISÉE"],
+  zemmour:      ["LE SUICIDE FRANÇAIS", "DESTIN FRANÇAIS", "C'ÉTAIT MIEUX EN 1660"],
+  marechal:     ["LA RELÈVE FAMILIALE", "CHANGEMENT D'ORBITE", "TRADITION SPATIALE"],
+  chenu:        ["JE SUIS SUR 3 PLATEAUX", "MATINALE ÉTERNELLE", "DUPLEX PERMANENT"],
+  melenchon:    ["LA RÉPUBLIQUE, C'EST MOI !", "QU'ILS S'EN AILLENT TOUS", "L'ÈRE DU PEUPLE", "LA SONO DU COSMOS"],
+  ruffin:       ["MERCI PATRON !", "DEBOUT LA PICARDIE", "REPORTAGE SAUVAGE"],
+  autain:       ["MOTION DE SYNTHÈSE", "NOUVEAU COURANT, ENCORE", "TRACT SUPERSONIQUE"],
+  panot:        ["RAPPEL AU RÈGLEMENT !", "MOTION DE CENSURE !", "SUSPENSION DE SÉANCE"],
+  roussel:      ["UN BON VIN, UNE BONNE VIANDE", "LA GAUCHE DU SAUCISSON", "MERGUEZ POUR TOUS"],
+  poutou:       ["PAS D'IMMUNITÉ OUVRIÈRE", "JE RENDS LE COSTUME", "CLÉ À MOLETTE !"],
+  hollande:     ["MOI PRÉSIDENT...", "ÇA VA MIEUX", "LE CHANGEMENT C'EST MAINTENANT", "SYNTHÈSE !"],
+  royal:        ["LA BRAVITUDE !", "GAGNANT-GAGNANT", "L'ORDRE JUSTE"],
+  hidalgo:      ["PARIS À VÉLO", "ZONE 30 GALACTIQUE", "TRAVAUX EN COURS"],
+  faure:        ["LA ROSE REDÉMARRE", "CONGRÈS PERMANENT", "MISE À JOUR 56K"],
+  aubry:        ["QUAND C'EST FLOU, IL Y A UN LOUP", "35 HEURES !", "LILLE FOREVER"],
+  glucksmann:   ["L'EUROPE NOUS REGARDE", "TRIBUNE À SUIVRE", "GRAVITÉ GÉOPOLITIQUE"],
+  rousseau:     ["DÉCONSTRUISEZ-VOUS !", "LE BARBECUE EST POLITIQUE", "ÉCOFÉMINISME ORBITAL"],
+  jadot:        ["ÉCOLOGIE DE GOUVERNEMENT", "100% RENOUVELABLE", "ÉOLIENNE DE COMBAT"],
+  tondelier:    ["LA VESTE VERTE !", "COMPOSTEZ VOS DOGMES", "LIANE DIPLOMATIQUE"],
+  voynet:       ["ÉCOLO AVANT L'HEURE", "SPORE DE SOBRIÉTÉ", "REPLANTEZ TOUT ÇA"],
+  larcher:      ["LE SÉNAT EST ÉTERNEL", "VIGIE DE LA RÉPUBLIQUE", "BUFFET RÉPUBLICAIN", "PROTOCOLE !"],
+  editorialiste:["ON NE PEUT PLUS RIEN DIRE", "LAISSEZ-MOI TERMINER !", "C'EST UN SCANDALE !"],
+  sondeur:      ["L'ARCHIPEL FRANÇAIS", "67% D'ACCORD", "MARGE D'ERREUR ±12"],
+  communicant:  ["DARKA !", "C'EST QUE DU LIVE !", "FANZONE !"],
+  militant:     ["OH ! LA MONTAGNE", "JE SUIS UN PAYSAN", "VIVE LA RURALITÉ"]
+};
+for (const c of CHARACTERS) c.punchlines = PUNCHLINES[c.id] || [];

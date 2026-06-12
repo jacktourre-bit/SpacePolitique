@@ -80,6 +80,19 @@ leaderboard-api.md  Plan de migration vers un leaderboard global (Supabase/REST)
 - **Score** : +10 petit ennemi, +50 élite, +500 boss, +100 cristal de discours,
   multiplicateur de **combo**, bonus **Esprit critique** (+150) après 12 s
   d'esquive parfaite.
+- **Punchlines réelles** : les projectiles ennemis sont les phrases cultes des
+  personnages (citations publiques célèbres, slogans de campagne, titres
+  d'œuvres) — « Casse-toi pauv' con », « La bravitude », « Moi président... »,
+  « 49.3 ! », « Darka ! »… avec effet « pop », halo et traînée lumineuse.
+- **Accélérateur de rythme** : +7 % de vitesse globale par niveau (ennemis,
+  cadences, projectiles). Au Sénat Final, tout va 63 % plus vite qu'au tutoriel.
+- **Armement évolutif** : jusqu'à **4 canons** (bonus C+, on en perd un par vie
+  perdue), et changement de type de tir : **missiles fact-checkeurs** à tête
+  chercheuse (MI) ou **laser transperçant** (LZ).
+- **LE GROS CALIBRE** 🍆 : une fois par épisode, une fusée rose au design,
+  disons, évocateur descend du ciel. Si tu l'attrapes : 6 secondes de feu
+  continu qui rase tout l'écran… mais **tout le jeu passe en vitesse ×2**,
+  ennemis et projectiles compris. Risque et récompense.
 - **Power-ups** : Esprit Critique (tir triple), Fact-check (purge l'écran),
   Débat Contradictoire (ralenti), Mémoire Historique (bouclier), Second Degré
   (−30 bourrage), Abstention Cosmique (intangible).
