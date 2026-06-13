@@ -304,6 +304,7 @@ const player = {
   triple: 0, slowField: 0, shield: 0, intangible: 0,
   weaponLevel: 1,          // nombre de canons (1 à 4)
   weaponType: "laser",     // laser | missiles | pierce
+  missilesTimer: 0,        // durée restante du mode missiles (s)
   calibre: 0,              // timer du GROS CALIBRE (feu continu + jeu ×2)
   touchTarget: null, touchFiring: false
 };
@@ -890,6 +891,7 @@ function applyPowerup(p) {
       break;
     case "missiles":
       player.weaponType = "missiles";
+      player.missilesTimer = 10;
       break;
     case "pierce":
       player.weaponType = "pierce";
@@ -1142,6 +1144,14 @@ function update(dt) {
   if (player.triple > 0) player.triple -= dt;
   if (player.slowField > 0) player.slowField -= dt;
   if (player.intangible > 0) player.intangible -= dt;
+  if (player.weaponType === "missiles" && player.missilesTimer > 0) {
+    player.missilesTimer -= dt;
+    if (player.missilesTimer <= 0) {
+      player.weaponType = "laser";
+      player.missilesTimer = 0;
+      floatText(player.x, player.y - 35, "MISSILES ÉPUISÉS", "#ff9f1c", 11);
+    }
+  }
 
   /* --- Déplacement joueur --- */
   let mvx = 0, mvy = 0;
@@ -1992,6 +2002,18 @@ function drawPlayer() {
     : player.weaponType === "pierce" ? "#ff5fff" : "#9ff5ff";
   ctx.fillStyle = cannonCol;
   for (const o of offs) ctx.fillRect(px + o - 2, py - 16, 4, 8);
+
+  /* Compte à rebours du mode tête chercheuse */
+  if (player.weaponType === "missiles" && player.missilesTimer > 0) {
+    const secs = Math.ceil(player.missilesTimer);
+    const urgent = secs <= 3;
+    ctx.fillStyle = urgent
+      ? (Math.floor(G.time * 8) % 2 === 0 ? "#ff9f1c" : "#ffffff")
+      : "#ff9f1c";
+    ctx.font = "bold 9px 'Courier New', monospace";
+    ctx.textAlign = "center";
+    ctx.fillText("MI " + secs + "s", px, py + 30);
+  }
 
   /* Aura du GROS CALIBRE : le vaisseau irradie de rose */
   if (player.calibre > 0) {
