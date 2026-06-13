@@ -291,7 +291,8 @@ const G = {
   /* Stats du niveau en cours (pour le récap et les médailles) */
   lvlLivesLost: 0, lvlHit: false, lvlCalibre: false, lvlComboMax: 0,
   lvlStartScore: 0, lvlStartTime: 0, bulletsFired: 0, bulletsHit: 0,
-  arsenalReached: false
+  arsenalReached: false,
+  asteroidTimer: 10
 };
 
 const player = {
@@ -314,6 +315,7 @@ let powerups = [];
 let particles = [];
 let texts = [];       // textes flottants
 let crystals = [];    // cristaux de discours (phase 4 Larcher)
+let asteroids = [];   // rochers mortels aléatoires
 let spawnQueue = [];
 let stars = [];
 let brains = [];
@@ -467,6 +469,39 @@ function spawnCrystals() {
   toast("DÉTRUIS LES CRISTAUX DE DISCOURS !", "#ff3355", 3);
 }
 
+function spawnAsteroid() {
+  const side = Math.floor(Math.random() * 3); // 0=haut, 1=gauche, 2=droite
+  const speed = rnd(70, 160);
+  const r = rnd(12, 26);
+  let x, y, vx, vy;
+  if (side === 0) {
+    x = rnd(r, GAME_W - r); y = -r;
+    const angle = rnd(0.2, Math.PI - 0.2);
+    vx = Math.cos(angle) * speed; vy = Math.abs(Math.sin(angle) * speed);
+  } else if (side === 1) {
+    x = -r; y = rnd(80, GAME_H * 0.75);
+    vx = rnd(60, speed); vy = rnd(-50, 100);
+  } else {
+    x = GAME_W + r; y = rnd(80, GAME_H * 0.75);
+    vx = -rnd(60, speed); vy = rnd(-50, 100);
+  }
+  /* Polygone irrégulier pré-calculé (7-9 sommets) */
+  const npts = 7 + Math.floor(Math.random() * 3);
+  const pts = [];
+  for (let i = 0; i < npts; i++) {
+    const ang = (i / npts) * Math.PI * 2;
+    const dist = r * (0.65 + Math.random() * 0.5);
+    pts.push({ x: Math.cos(ang) * dist, y: Math.sin(ang) * dist });
+  }
+  asteroids.push({
+    x, y, vx, vy, r,
+    rot: Math.random() * Math.PI * 2,
+    rotSpeed: rnd(-1.8, 1.8),
+    hp: Math.max(1, Math.floor(r / 10)),
+    pts
+  });
+}
+
 /* Seed déterministe du Défi du Jour : même cerveau pour tout le monde */
 function dailySeed() {
   const d = new Date();
@@ -526,7 +561,7 @@ function showLevelIntro() {
 function beginLevel() {
   const level = LEVELS[G.levelIndex];
   bullets = []; shots = []; enemies = []; powerups = [];
-  particles = []; texts = []; crystals = []; spawnQueue = [];
+  particles = []; texts = []; crystals = []; asteroids = []; spawnQueue = [];
   G.plan = planLevel(level);
   G.waveIndex = 0;
   G.flow = { state: "wave", timer: 0 };
@@ -539,6 +574,7 @@ function beginLevel() {
   G.specialTimer = rnd(5, 14);
   G.specialDropped = false;
   G.calibreCaught = false;
+  G.asteroidTimer = rnd(10, 18);
   /* Stats du niveau (récap + médailles) */
   G.lvlLivesLost = 0; G.lvlHit = false; G.lvlCalibre = false; G.lvlComboMax = 0;
   G.lvlStartScore = G.score; G.lvlStartTime = Date.now();
@@ -1294,6 +1330,20 @@ function update(dt) {
   }
   powerups = powerups.filter(p => p.y < GAME_H + 20);
 
+  /* --- Astéroïdes --- */
+  if (G.flow.state !== "level_clear") {
+    G.asteroidTimer -= dt;
+    if (G.asteroidTimer <= 0) {
+      G.asteroidTimer = G.flow.state === "boss" ? rnd(4, 8) : rnd(9, 15);
+      spawnAsteroid();
+    }
+  }
+  for (const a of asteroids) {
+    a.x += a.vx * dt;
+    a.y += a.vy * dt;
+    a.rot += a.rotSpeed * dt;
+  }
+
   /* --- Particules / textes --- */
   for (const pa of particles) {
     pa.t += dt; pa.x += pa.vx * dt; pa.y += pa.vy * dt;
@@ -1347,8 +1397,29 @@ function update(dt) {
         }
       }
     }
+    if (!consumed) {
+      for (const a of asteroids) {
+        if (a.dead) continue;
+        const dx = b.x - a.x, dy = b.y - a.y;
+        if (dx * dx + dy * dy < a.r * a.r) {
+          a.hp -= (b.dmg || 1);
+          burst(b.x, b.y, "#a09880", 3, 80);
+          AudioFX.enemyHit();
+          if (!b.counted) { G.bulletsHit++; b.counted = true; }
+          if (!(b.pierce && b.pierce-- > 0)) consumed = true;
+          if (a.hp <= 0) {
+            a.dead = true;
+            burst(a.x, a.y, "#a09880", 12, 140);
+            floatText(a.x, a.y, "+50", "#a09880");
+            G.score += 50;
+          }
+          break;
+        }
+      }
+    }
     if (consumed) b.dead = true;
   }
+  asteroids = asteroids.filter(a => !a.dead && a.x > -80 && a.x < GAME_W + 80 && a.y > -80 && a.y < GAME_H + 80);
   bullets = bullets.filter(b => !b.dead);
 
   /* --- Collisions : projectiles ennemis → joueur --- */
@@ -1379,6 +1450,37 @@ function update(dt) {
     if (dx * dx + dy * dy < 28 * 28) { p.dead = true; applyPowerup(p); }
   }
   powerups = powerups.filter(p => !p.dead);
+
+  /* --- Collisions : astéroïdes → joueur --- */
+  if (player.intangible <= 0 && player.invuln <= 0) {
+    for (let i = asteroids.length - 1; i >= 0; i--) {
+      const a = asteroids[i];
+      const dx = a.x - player.x, dy = a.y - player.y;
+      if (dx * dx + dy * dy < (a.r + player.r) * (a.r + player.r)) {
+        asteroids.splice(i, 1);
+        burst(player.x, player.y, "#a09880", 10, 140);
+        if (player.shield > 0) {
+          player.shield--;
+          floatText(player.x, player.y - 25, "BOUCLIER !", "#3ddc84");
+          AudioFX.enemyHit();
+          haptic(20);
+        } else {
+          G.lives--;
+          G.lvlLivesLost++; G.lvlHit = true;
+          player.weaponLevel = Math.max(1, player.weaponLevel - 1);
+          G.bourrage = Math.min(100, G.bourrage + 15 * G.diff.bourrage);
+          G.dodgeTimer = 0; G.bourrageFlash = 0.5;
+          player.invuln = 1.5;
+          G.shake = 0.4;
+          AudioFX.playerHit();
+          haptic([40, 30, 70]);
+          floatText(player.x, player.y - 30, "ASTÉROÏDE !", "#a09880", 12);
+          if (G.lives <= 0 || G.bourrage >= 100) { endRun(false); return; }
+        }
+        break;
+      }
+    }
+  }
 
   /* --- Progression du niveau --- */
   if (G.flow.state === "wave") {
@@ -1468,12 +1570,14 @@ function render() {
 
   if (G.screen === "playing") {
     drawCrystals();
+    drawAsteroids();
     drawEnemies();
     drawShots();
     drawBullets();
     drawPowerups();
     drawGuides();
     drawPlayer();
+    drawProgressBar();
 
     /* Halo sous le doigt (interface tactile) */
     if (pointerIndicator.active) {
@@ -1738,6 +1842,82 @@ function drawPowerups() {
     ctx.textAlign = "center";
     ctx.fillText(def.sym, p.x, p.y + 4 + bob);
   }
+}
+
+function drawAsteroids() {
+  for (const a of asteroids) {
+    ctx.save();
+    ctx.translate(a.x, a.y);
+    ctx.rotate(a.rot);
+    ctx.fillStyle = "#605c50";
+    ctx.beginPath();
+    ctx.moveTo(a.pts[0].x, a.pts[0].y);
+    for (let i = 1; i < a.pts.length; i++) ctx.lineTo(a.pts[i].x, a.pts[i].y);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = "#a09878";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+    /* Petit cratère central */
+    ctx.fillStyle = "rgba(30,28,22,0.55)";
+    ctx.beginPath();
+    ctx.arc(a.x, a.y, a.r * 0.28, 0, 7);
+    ctx.fill();
+  }
+}
+
+function drawProgressBar() {
+  const level = LEVELS[G.levelIndex];
+  const totalSegs = level.waves + 1; // vagues + boss
+  const segH = 1 / totalSegs;
+
+  let prog = 0;
+  if (G.flow.state === "wave") {
+    const aliveCount = enemies.length + spawnQueue.length;
+    const cleared = Math.max(0, 1 - aliveCount / Math.max(1, level.enemiesPerWave));
+    prog = (G.waveIndex + cleared) * segH;
+  } else if (G.flow.state === "wave_break" || G.flow.state === "boss_incoming") {
+    prog = Math.min(level.waves, G.waveIndex + 1) * segH;
+  } else if (G.flow.state === "boss") {
+    const bossList = enemies.filter(e => e.isBoss);
+    const bossHp = bossList.reduce((s, b) => s + b.hp, 0);
+    const bossMx = bossList.reduce((s, b) => s + b.maxHp, 0);
+    const bossCleared = bossMx > 0 ? 1 - bossHp / bossMx : 1;
+    prog = level.waves * segH + bossCleared * segH;
+  } else if (G.flow.state === "level_clear") {
+    prog = 1;
+  }
+  prog = Math.min(1, Math.max(0, prog));
+
+  const bx = 5, bw = 8;
+  const by = 110, bh = GAME_H - 130;
+
+  ctx.fillStyle = "rgba(0,0,0,0.45)";
+  ctx.fillRect(bx - 1, by - 1, bw + 2, bh + 2);
+
+  const fillH = bh * prog;
+  ctx.fillStyle = prog > 0.85 ? "#ff3355" : prog > 0.6 ? "#ffd166" : "#3ddc84";
+  ctx.fillRect(bx, by + bh - fillH, bw, fillH);
+
+  /* Marqueurs de vague (cyan) + boss (or) */
+  for (let w = 1; w <= totalSegs; w++) {
+    const tickY = by + bh - bh * (w * segH);
+    const isLast = w === totalSegs;
+    ctx.fillStyle = isLast ? "#ffd166" : "rgba(125,240,255,0.65)";
+    ctx.fillRect(bx - 2, tickY - 1, bw + 4, isLast ? 3 : 2);
+  }
+
+  ctx.strokeStyle = "rgba(125,240,255,0.28)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(bx, by, bw, bh);
+
+  /* Étiquette courante */
+  ctx.fillStyle = "#7df0ff";
+  ctx.font = "bold 7px 'Courier New', monospace";
+  ctx.textAlign = "center";
+  const label = G.flow.state === "boss" ? "BOSS" : "V" + (G.waveIndex + 1) + "/" + level.waves;
+  ctx.fillText(label, bx + bw / 2, by - 4);
 }
 
 function drawCrystals() {
