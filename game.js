@@ -322,7 +322,7 @@ let brains = [];
 
 /* ============================ DOM ============================ */
 const $ = (id) => document.getElementById(id);
-const SCREEN_IDS = ["screen-title", "screen-levelselect", "screen-difficulty",
+const SCREEN_IDS = ["screen-crawl", "screen-title", "screen-levelselect", "screen-difficulty",
   "screen-levelintro", "screen-pause", "screen-continue", "screen-levelclear",
   "screen-gameover", "screen-victory", "screen-leaderboard", "screen-credits"];
 
@@ -340,6 +340,35 @@ function showScreen(name) {
   $("hud").classList.toggle("hidden", !inGame);
   $("touch-controls").classList.toggle("hidden", !inGame);
   G.screen = name || "playing";
+}
+
+/* Redémarre l'animation CSS du crawl (au cas où le DOM la met en cache) */
+function restartCrawlAnim() {
+  const el = document.querySelector(".sw-crawl");
+  if (!el) return;
+  el.style.animation = "none";
+  void el.offsetHeight;
+  el.style.animation = "sw-roll 20s linear forwards";
+}
+
+let _crawlTimeout = null;
+function showCrawl() {
+  showScreen("screen-crawl");
+  restartCrawlAnim();
+  _crawlTimeout = setTimeout(() => {
+    if (G.screen === "screen-crawl") {
+      showScreen("screen-title");
+      AudioFX.ensure();
+      Music.play("title");
+    }
+  }, 20000);
+}
+function skipCrawl() {
+  if (G.screen !== "screen-crawl") return;
+  if (_crawlTimeout) { clearTimeout(_crawlTimeout); _crawlTimeout = null; }
+  showScreen("screen-title");
+  AudioFX.ensure();
+  Music.play("title");
 }
 
 /* ============================ FOND ÉTOILÉ / CÉRÉBRAL ============================ */
@@ -2163,6 +2192,8 @@ function updateHapticsBtn() {
 }
 
 /* ============================ BRANCHEMENT DES BOUTONS ============================ */
+$("screen-crawl").addEventListener("click", skipCrawl);
+$("screen-crawl").addEventListener("touchstart", (e) => { e.preventDefault(); skipCrawl(); }, { passive: false });
 $("btn-start").addEventListener("click", () => { AudioFX.ensure(); Music.play("title"); G.startLevel = 0; showScreen("screen-difficulty"); });
 $("btn-levels").addEventListener("click", () => { AudioFX.ensure(); Music.play("title"); showLevelSelect(); });
 $("btn-daily").addEventListener("click", () => { AudioFX.ensure(); startRun("normal", { daily: true }); });
@@ -2240,5 +2271,5 @@ if (document.addEventListener) {
 
 initBackground();
 updateHapticsBtn();
-showScreen("screen-title");
+showCrawl();
 requestAnimationFrame(frame);

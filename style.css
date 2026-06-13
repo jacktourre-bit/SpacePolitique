@@ -427,3 +427,87 @@ button { touch-action: manipulation; }
   #hud { padding-top: calc(6px + env(safe-area-inset-top)); }
   #touch-controls { top: calc(56px + env(safe-area-inset-top)); }
 }
+
+/* ============== Intro Star Wars ============== */
+#screen-crawl {
+  display: block;
+  padding: 0;
+  background: rgba(0, 0, 0, 0.9);
+  overflow: hidden;
+  cursor: pointer;
+}
+
+/* Fondu haut pour masquer le texte qui disparaît */
+.sw-fade {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 28%;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.98) 0%, transparent 100%);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Scène 3D : la perspective est posée ici */
+.sw-scene {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  perspective: 240px;
+  perspective-origin: 50% 22%;
+}
+
+/* Le bloc de texte qui défile en remontant sur le plan incliné */
+.sw-crawl {
+  position: absolute;
+  top: 108%;
+  left: 7%;
+  width: 86%;
+  color: #ffd166;
+  font-family: "Courier New", monospace;
+  font-size: clamp(10px, 2.7vmin, 16px);
+  font-weight: bold;
+  line-height: 1.95;
+  text-align: center;
+  transform-origin: 50% 100%;
+  transform: rotateX(28deg);
+  animation: sw-roll 20s linear forwards;
+}
+
+.sw-episode {
+  color: #7df0ff;
+  font-size: clamp(12px, 3vmin, 18px);
+  letter-spacing: 5px;
+  text-shadow: 0 0 12px rgba(125,240,255,0.7);
+}
+
+.sw-title-big {
+  font-size: clamp(18px, 5.5vmin, 34px);
+  letter-spacing: 5px;
+  text-shadow: 0 0 22px rgba(255,209,102,0.75), 2px 2px 0 #a05010;
+  margin: 4px 0 18px;
+}
+
+/* "Appuyer pour passer" clignotant en bas */
+.sw-skip {
+  position: absolute;
+  bottom: 16px;
+  left: 0; right: 0;
+  text-align: center;
+  color: rgba(125,240,255,0.45);
+  font-family: "Courier New", monospace;
+  font-size: clamp(9px, 2vmin, 11px);
+  letter-spacing: 2px;
+  pointer-events: none;
+  z-index: 3;
+  animation: sw-blink 1.5s ease-in-out infinite;
+}
+
+@keyframes sw-roll {
+  from { top: 108%; }
+  to   { top: -430%; }
+}
+
+@keyframes sw-blink {
+  0%, 100% { opacity: 0.35; }
+  50%       { opacity: 0.9; }
+}
