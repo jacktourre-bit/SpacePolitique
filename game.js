@@ -14,9 +14,9 @@ const GAME_W = 480;
 const GAME_H = 854;
 
 const DIFFICULTIES = {
-  facile:    { key: "facile",    label: "Facile",               speed: 0.75, fire: 0.70, bourrage: 0.70, autoFire: true  },
-  normal:    { key: "normal",    label: "Normal",               speed: 1.00, fire: 1.00, bourrage: 1.00, autoFire: false },
-  cauchemar: { key: "cauchemar", label: "Cauchemar médiatique", speed: 1.35, fire: 1.50, bourrage: 1.40, autoFire: false }
+  facile:    { key: "facile",    label: "Facile",               speed: 0.75, fire: 0.70, bourrage: 0.70, autoFire: true,  continues: 2, kamikaze: 0.5, startShield: 1 },
+  normal:    { key: "normal",    label: "Normal",               speed: 1.00, fire: 1.00, bourrage: 1.00, autoFire: false, continues: 1, kamikaze: 1.0, startShield: 0 },
+  cauchemar: { key: "cauchemar", label: "Cauchemar médiatique", speed: 1.35, fire: 1.50, bourrage: 1.40, autoFire: false, continues: 0, kamikaze: 1.3, startShield: 0 }
 };
 
 const POWERUP_TYPES = {
@@ -282,7 +282,16 @@ const G = {
   shake: 0,
   bourrageFlash: 0,
   time: 0,
-  victory: false
+  victory: false,
+  continues: 1,
+  daily: false,
+  startLevel: 0,
+  slowmo: 0,            // ralenti spectaculaire (secondes réelles restantes)
+  newMedals: [],        // médailles gagnées au dernier niveau
+  /* Stats du niveau en cours (pour le récap et les médailles) */
+  lvlLivesLost: 0, lvlHit: false, lvlCalibre: false, lvlComboMax: 0,
+  lvlStartScore: 0, lvlStartTime: 0, bulletsFired: 0, bulletsHit: 0,
+  arsenalReached: false
 };
 
 const player = {
@@ -311,8 +320,17 @@ let brains = [];
 
 /* ============================ DOM ============================ */
 const $ = (id) => document.getElementById(id);
-const SCREEN_IDS = ["screen-title", "screen-difficulty", "screen-levelintro",
-  "screen-pause", "screen-gameover", "screen-victory", "screen-leaderboard", "screen-credits"];
+const SCREEN_IDS = ["screen-title", "screen-levelselect", "screen-difficulty",
+  "screen-levelintro", "screen-pause", "screen-continue", "screen-levelclear",
+  "screen-gameover", "screen-victory", "screen-leaderboard", "screen-credits"];
+
+/* ============================ VIBRATIONS (haptique mobile) ============================ */
+let HAPTICS = Progress.getHaptics();
+function haptic(pattern) {
+  if (HAPTICS && IS_TOUCH && navigator.vibrate) {
+    try { navigator.vibrate(pattern); } catch (_) {}
+  }
+}
 
 function showScreen(name) {
   for (const id of SCREEN_IDS) $(id).classList.toggle("hidden", id !== name);
@@ -406,7 +424,7 @@ function makeEnemy(charId, slotX, slotY, isBoss, bossHp) {
     fireTimer: rnd(1.0, 3.0),
     speed: ch.speed * wavePlan.speedJitter * G.diff.speed * paceMult(),
     state: "idle", stateTimer: 0,
-    diveTimer: runRng() < wavePlan.kamikazeChance ? rnd(3, 9) : Infinity,
+    diveTimer: runRng() < wavePlan.kamikazeChance * (G.diff.kamikaze || 1) ? rnd(3, 9) : Infinity,
     diving: false, diveT: 0, diveTx: 0, diveTy: 0,
     revived: false,
     minionTimer: 3, crystalTimer: 0,
@@ -449,18 +467,32 @@ function spawnCrystals() {
   toast("DÉTRUIS LES CRISTAUX DE DISCOURS !", "#ff3355", 3);
 }
 
+/* Seed déterministe du Défi du Jour : même cerveau pour tout le monde */
+function dailySeed() {
+  const d = new Date();
+  const key = d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate();
+  return hashId("defi-" + key);
+}
+
 /* ============================ FLOW DU NIVEAU ============================ */
-function startRun(diffKey) {
+function startRun(diffKey, opts) {
+  opts = opts || {};
   G.diff = DIFFICULTIES[diffKey];
+  G.daily = !!opts.daily;
   G.autoFire = G.diff.autoFire || IS_TOUCH;
   $("btn-autofire").classList.toggle("active", G.autoFire);
-  runRng = mulberry32(((Date.now() & 0xffffffff) ^ (Math.random() * 0xffffffff)) >>> 0);
-  G.levelIndex = 0;
+  if (G.daily) runRng = mulberry32(dailySeed());
+  else if (opts.seed !== undefined) runRng = mulberry32(opts.seed >>> 0);
+  else runRng = mulberry32(((Date.now() & 0xffffffff) ^ (Math.random() * 0xffffffff)) >>> 0);
+  G.levelIndex = G.daily ? 0 : (opts.startLevel || 0);
+  G.continues = G.daily ? 0 : G.diff.continues;
   G.score = 0; G.lives = 3; G.bourrage = 0;
   G.influences = {}; G.combo = 0; G.comboTimer = 0; G.dodgeTimer = 0;
   G.defeatedBosses = []; G.victory = false;
   G.startTime = Date.now();
-  player.weaponLevel = 1; player.weaponType = "laser"; player.calibre = 0;
+  /* Armement de départ adapté au niveau choisi (sélection de niveau) */
+  player.weaponLevel = Math.min(4, 1 + Math.floor(G.levelIndex / 3));
+  player.weaponType = "laser"; player.calibre = 0;
   showLevelIntro();
 }
 
@@ -500,13 +532,17 @@ function beginLevel() {
   G.flow = { state: "wave", timer: 0 };
   player.x = GAME_W / 2; player.y = GAME_H - 110;
   player.cooldown = 0; player.invuln = 1;
-  player.triple = 0; player.slowField = 0; player.shield = 0; player.intangible = 0;
+  player.triple = 0; player.slowField = 0; player.shield = G.diff.startShield || 0; player.intangible = 0;
   player.touchTarget = null;
   /* Le bonus spécial GROS CALIBRE est GARANTI une fois par épisode :
    * il tombe tôt, retombe s'il est raté, et est forcé avant le boss */
   G.specialTimer = rnd(5, 14);
   G.specialDropped = false;
   G.calibreCaught = false;
+  /* Stats du niveau (récap + médailles) */
+  G.lvlLivesLost = 0; G.lvlHit = false; G.lvlCalibre = false; G.lvlComboMax = 0;
+  G.lvlStartScore = G.score; G.lvlStartTime = Date.now();
+  G.bulletsFired = 0; G.bulletsHit = 0; G.newMedals = [];
   spawnWave();
   showScreen(null);
   banner(["NIVEAU " + level.id, level.name], 2.2, "#7df0ff");
@@ -544,7 +580,9 @@ function onBossesDefeated() {
   }
   confettiBurst(GAME_W / 2, 200, 60);
   AudioFX.fanfare();
-  G.flow = { state: "level_clear", timer: 2.6 };
+  haptic([60, 40, 60, 40, 140]);
+  G.slowmo = 1.1; // ralenti spectaculaire à la chute du boss
+  G.flow = { state: "level_clear", timer: 2.8 };
   banner(["ZONE DÉPROGRAMMÉE !"], 2.4, "#3ddc84");
 }
 
@@ -558,11 +596,36 @@ function nextLevelOrVictory() {
 }
 
 function endRun(victory) {
+  /* Défaite avec un continue disponible : on propose de reprendre le niveau */
+  if (!victory && G.continues > 0) {
+    Music.setPaused(true);
+    $("cont-count").textContent = G.continues;
+    showScreen("screen-continue");
+    return;
+  }
+  finalizeRun(victory);
+}
+
+/* Reprendre le niveau courant en gardant le score (coûte un continue) */
+function doContinue() {
+  G.continues--;
+  G.lives = 3;
+  G.bourrage = 0;
+  Music.setPaused(false);
+  beginLevel();
+  banner(["CONTINUE !", "Reprends ce niveau"], 1.8, "#3ddc84");
+}
+
+function finalizeRun(victory) {
   G.victory = victory;
   Music.stop();
   const duration = Math.floor((Date.now() - G.startTime) / 1000);
   G.runDuration = duration;
+  Progress.setBest(G.score);
   if (victory) {
+    Progress.awardMedal("revolution");
+    Progress.awardMedal("senat");
+    Progress.unlockLevel(10);
     $("v-score").textContent = G.score;
     $("v-name").value = localStorage.getItem("bdc_player_name") || "";
     showScreen("screen-victory");
@@ -577,6 +640,62 @@ function endRun(victory) {
     showScreen("screen-gameover");
     AudioFX.gameover();
   }
+}
+
+/* ============================ RÉCAP DE NIVEAU + MÉDAILLES ============================ */
+function computeLevelMedals() {
+  const level = LEVELS[G.levelIndex];
+  const fired = G.bulletsFired, hit = G.bulletsHit;
+  const accuracy = fired > 0 ? Math.min(100, Math.round(hit / fired * 100)) : 0;
+  const earned = [];
+  const tryAward = (id, cond) => { if (cond && Progress.awardMedal(id)) earned.push(id); };
+  tryAward("pacifiste", G.lvlLivesLost === 0);
+  tryAward("intouchable", !G.lvlHit);
+  tryAward("tireur", fired >= 20 && accuracy >= 80);
+  tryAward("tribun", G.lvlComboMax >= 10);
+  tryAward("calibre", G.lvlCalibre);
+  tryAward("arsenal", G.arsenalReached);
+  if (level.boss.includes("larcher")) tryAward("senat", true);
+  return { accuracy, earned };
+}
+
+function showLevelRecap() {
+  const level = LEVELS[G.levelIndex];
+  const gained = G.score - G.lvlStartScore;
+  const secs = Math.max(1, Math.round((Date.now() - G.lvlStartTime) / 1000));
+  const { accuracy, earned } = computeLevelMedals();
+  Progress.unlockLevel(G.levelIndex + 2); // débloque le niveau suivant
+  Progress.setBest(G.score);
+
+  $("lc-name").textContent = "Niveau " + level.id + " — " + level.name;
+  $("lc-stats").innerHTML =
+    statRow("Score du niveau", "+" + gained) +
+    statRow("Combo max", "×" + G.lvlComboMax) +
+    statRow("Précision", accuracy + "%") +
+    statRow("Vies perdues", String(G.lvlLivesLost)) +
+    statRow("Temps", secs + "s");
+
+  const medalsWrap = $("lc-medals");
+  if (earned.length) {
+    medalsWrap.innerHTML = '<div class="medal-banner">MÉDAILLE' + (earned.length > 1 ? "S" : "") + " DÉBLOQUÉE" + (earned.length > 1 ? "S" : "") + " !</div>" +
+      earned.map(id => {
+        const m = Progress.MEDALS[id];
+        return '<div class="medal-new"><span class="medal-emoji">' + m.emoji +
+          '</span><span class="medal-text"><strong>' + m.name + "</strong><br><small>" +
+          m.desc + "</small></span></div>";
+      }).join("");
+    AudioFX.fanfare();
+    haptic([0, 40, 40, 80]);
+  } else {
+    medalsWrap.innerHTML = "";
+  }
+  $("btn-lc-next").textContent = (G.levelIndex >= LEVELS.length - 1) ? "VICTOIRE →" : "NIVEAU SUIVANT →";
+  Music.play("title");
+  showScreen("screen-levelclear");
+}
+
+function statRow(label, val) {
+  return '<div class="stat-row"><span>' + label + '</span><span class="stat-val">' + val + "</span></div>";
 }
 
 /* Orientation politique humoristique selon les influences subies */
@@ -641,6 +760,7 @@ function deprogram(e, giveScore) {
   if (giveScore) {
     G.combo = (G.comboTimer > 0) ? G.combo + 1 : 1;
     G.comboTimer = 2.0;
+    if (G.combo > G.lvlComboMax) G.lvlComboMax = G.combo;
     const mult = 1 + 0.1 * Math.min(G.combo - 1, 10);
     const pts = Math.round(e.ch.scoreValue * mult);
     G.score += pts;
@@ -679,6 +799,7 @@ function dropPowerup(x, y) {
 function applyPowerup(p) {
   const def = POWERUP_TYPES[p.type];
   AudioFX.powerup();
+  haptic(20);
   floatText(player.x, player.y - 30, def.name, def.color, 11);
   switch (p.type) {
     case "esprit_critique": player.triple = 8; break;
@@ -695,6 +816,7 @@ function applyPowerup(p) {
     case "canon_plus":
       if (player.weaponLevel < 4) {
         player.weaponLevel++;
+        if (player.weaponLevel >= 4) G.arsenalReached = true;
         floatText(player.x, player.y - 45, player.weaponLevel + " CANONS !", "#7dff7d", 14);
       } else {
         G.score += 200;
@@ -710,11 +832,13 @@ function applyPowerup(p) {
     case "gros_calibre":
       player.calibre = 6;
       G.calibreCaught = true;
+      G.lvlCalibre = true;
       G.shake = 0.6;
       confettiBurst(player.x, player.y, 40);
       banner(["LE GROS CALIBRE !!!", "FEU CONTINU — TOUT VA 2× PLUS VITE"], 2.2, "#ffb0c8");
       Music.stinger("calibre_catch");
       AudioFX.alarm();
+      haptic([0, 60, 30, 90]);
       break;
   }
 }
@@ -722,6 +846,7 @@ function applyPowerup(p) {
 /* ============================ ARMEMENT DU JOUEUR ============================ */
 function fireWeapon() {
   const offs = WEAPON_OFFSETS[Math.min(WEAPON_OFFSETS.length - 1, player.weaponLevel - 1)];
+  G.bulletsFired += offs.length + (player.triple > 0 ? 2 : 0);
   switch (player.weaponType) {
     case "missiles":
       player.cooldown = 0.34;
@@ -768,9 +893,10 @@ function hitPlayerWithShot(s) {
   const ch = s.src;
   G.bourrage = Math.min(100, G.bourrage + 8 * G.diff.bourrage);
   addInfluence(s.family, ch ? ch.influenceValue * 0.5 : 3);
-  G.dodgeTimer = 0; G.bourrageFlash = 0.35;
+  G.dodgeTimer = 0; G.bourrageFlash = 0.35; G.lvlHit = true;
   player.invuln = 0.6;
   AudioFX.playerHit();
+  haptic(30);
   floatText(player.x, player.y - 25, s.word + " !", "#ff5fb0", 10);
   if (G.bourrage >= 100) endRun(false);
 }
@@ -784,6 +910,7 @@ function hitPlayerWithBody(e) {
     return;
   }
   G.lives--;
+  G.lvlLivesLost++; G.lvlHit = true;
   player.weaponLevel = Math.max(1, player.weaponLevel - 1); // on perd un canon
   G.bourrage = Math.min(100, G.bourrage + 15 * G.diff.bourrage);
   addInfluence(e.ch.family, e.ch.influenceValue);
@@ -791,6 +918,7 @@ function hitPlayerWithBody(e) {
   player.invuln = 1.5;
   G.shake = 0.4;
   AudioFX.playerHit();
+  haptic([40, 30, 70]);
   floatText(player.x, player.y - 30, "INFLUENCE " + (FAMILY_INFO[e.ch.family] || {}).label, "#ff3355", 10);
   if (!e.isBoss) deprogram(e, false);
   if (G.lives <= 0 || G.bourrage >= 100) endRun(false);
@@ -978,6 +1106,7 @@ function update(dt) {
     /* FEU CONTINU : méga-rafales qui transpercent tout */
     if (player.cooldown <= 0) {
       player.cooldown = 0.07;
+      G.bulletsFired++;
       bullets.push({ x: player.x, y: player.y - 20, vx: 0, vy: -720,
         dmg: 5, pierce: 99, kind: "mega" });
       burst(player.x, player.y - 22, "#ffb0c8", 3, 90);
@@ -1182,6 +1311,7 @@ function update(dt) {
       const dx = b.x - e.x, dy = b.y - e.y;
       if (dx * dx + dy * dy < e.r * e.r) {
         e.hp -= (b.dmg || 1);
+        if (!b.counted) { G.bulletsHit++; b.counted = true; }
         if (e.state !== "attack") { e.state = "hit"; e.stateTimer = 0.15; }
         const impactCol = b.kind === "mega" ? "#ffb0c8" : b.kind === "pierce" ? "#ff5fff" : "#7df0ff";
         burst(b.x, b.y, impactCol, b.kind === "mega" ? 8 : 3, b.kind === "mega" ? 160 : 90);
@@ -1263,7 +1393,11 @@ function update(dt) {
     /* géré par onBossesDefeated */
   } else if (G.flow.state === "level_clear") {
     G.flow.timer -= dt;
-    if (G.flow.timer <= 0) nextLevelOrVictory();
+    if (G.flow.timer <= 0) {
+      /* Dernier niveau : on file vers la victoire. Sinon, écran de récap. */
+      if (G.levelIndex >= LEVELS.length - 1) nextLevelOrVictory();
+      else showLevelRecap();
+    }
   }
 
   /* --- Fond --- */
@@ -1338,6 +1472,7 @@ function render() {
     drawShots();
     drawBullets();
     drawPowerups();
+    drawGuides();
     drawPlayer();
 
     /* Halo sous le doigt (interface tactile) */
@@ -1392,6 +1527,17 @@ function render() {
     ctx.fillRect(0, 0, GAME_W, GAME_H);
   }
 
+  /* Alerte de saturation : vignette rouge pulsante quand le bourrage est haut */
+  if (G.screen === "playing" && G.bourrage >= 75) {
+    const intensity = (G.bourrage - 75) / 25; // 0..1
+    const a = (0.18 + Math.sin(G.time * 8) * 0.1) * intensity;
+    const vg = ctx.createRadialGradient(GAME_W / 2, GAME_H / 2, GAME_H * 0.3, GAME_W / 2, GAME_H / 2, GAME_H * 0.62);
+    vg.addColorStop(0, "rgba(255,45,122,0)");
+    vg.addColorStop(1, "rgba(255,45,122," + Math.max(0, a).toFixed(3) + ")");
+    ctx.fillStyle = vg;
+    ctx.fillRect(0, 0, GAME_W, GAME_H);
+  }
+
   /* Barre de vie des boss */
   if (G.screen === "playing") {
     const bosses = enemies.filter(e => e.isBoss);
@@ -1432,6 +1578,37 @@ function render() {
   }
 
   ctx.restore();
+}
+
+/* Indicateurs de danger : flèches pour les ennemis qui arrivent hors écran,
+ * réticule + ligne pour les piqués kamikazes. */
+function drawGuides() {
+  for (const e of enemies) {
+    /* Flèche de bord pour un ennemi encore hors de l'écran */
+    if (e.entryT < 1 && (e.x < 0 || e.x > GAME_W || e.y < 0)) {
+      const ax = Math.max(16, Math.min(GAME_W - 16, e.x));
+      const ay = Math.max(70, Math.min(GAME_H - 40, e.y));
+      const ang = Math.atan2(e.y - ay, e.x - ax);
+      ctx.save();
+      ctx.translate(ax, ay);
+      ctx.rotate(ang);
+      ctx.fillStyle = "rgba(255,159,28,0.85)";
+      ctx.beginPath();
+      ctx.moveTo(10, 0); ctx.lineTo(-6, -7); ctx.lineTo(-6, 7); ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+    /* Piqué imminent ou en cours : réticule sur la cible + ligne d'alerte */
+    if (e.diving) {
+      const pulse = 8 + Math.sin(G.time * 18) * 4;
+      ctx.strokeStyle = "rgba(255,51,85,0.8)";
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(player.x, player.y, 18 + pulse, 0, 7); ctx.stroke();
+      ctx.globalAlpha = 0.4;
+      ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(player.x, player.y); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+  }
 }
 
 function drawEnemies() {
@@ -1764,10 +1941,54 @@ function saveScore(nameInputId) {
   showLeaderboard("global");
 }
 
+/* ============================ SÉLECTION DE NIVEAU ============================ */
+function showLevelSelect() {
+  const unlocked = Progress.getUnlocked();
+  const grid = $("ls-grid");
+  grid.innerHTML = "";
+  LEVELS.forEach((lv, i) => {
+    const open = (i + 1) <= unlocked;
+    const cell = document.createElement("button");
+    cell.className = "ls-cell" + (open ? "" : " locked");
+    cell.innerHTML = open
+      ? '<span class="ls-num">' + lv.id + '</span><span class="ls-lvname">' + lv.name + "</span>"
+      : '<span class="ls-num">🔒</span><span class="ls-lvname">Niveau ' + lv.id + "</span>";
+    if (open) {
+      cell.addEventListener("click", () => {
+        AudioFX.ensure();
+        G.startLevel = i;
+        showScreen("screen-difficulty");
+      });
+    }
+    grid.appendChild(cell);
+  });
+  showScreen("screen-levelselect");
+}
+
+/* Galerie des médailles (écran crédits) */
+function renderCreditsMedals() {
+  const got = Progress.getMedals();
+  const wrap = $("credits-medals");
+  wrap.innerHTML = Object.entries(Progress.MEDALS).map(([id, m]) => {
+    const has = !!got[id];
+    return '<div class="medal-item' + (has ? "" : " locked") + '">' +
+      '<span class="medal-emoji">' + (has ? m.emoji : "❓") + "</span>" +
+      '<span class="medal-text"><strong>' + m.name + "</strong><br><small>" +
+      (has ? m.desc : "À débloquer…") + "</small></span></div>";
+  }).join("");
+}
+
+function updateHapticsBtn() {
+  $("btn-haptics").textContent = "VIBRATIONS : " + (HAPTICS ? "ON" : "OFF");
+}
+
 /* ============================ BRANCHEMENT DES BOUTONS ============================ */
-$("btn-start").addEventListener("click", () => { AudioFX.ensure(); Music.play("title"); showScreen("screen-difficulty"); });
+$("btn-start").addEventListener("click", () => { AudioFX.ensure(); Music.play("title"); G.startLevel = 0; showScreen("screen-difficulty"); });
+$("btn-levels").addEventListener("click", () => { AudioFX.ensure(); Music.play("title"); showLevelSelect(); });
+$("btn-daily").addEventListener("click", () => { AudioFX.ensure(); startRun("normal", { daily: true }); });
+$("btn-ls-back").addEventListener("click", () => showScreen("screen-title"));
 $("btn-leaderboard").addEventListener("click", () => showLeaderboard("global"));
-$("btn-credits").addEventListener("click", () => showScreen("screen-credits"));
+$("btn-credits").addEventListener("click", () => { renderCreditsMedals(); showScreen("screen-credits"); });
 $("btn-credits-back").addEventListener("click", () => showScreen("screen-title"));
 $("btn-fullscreen").addEventListener("click", () => {
   const el = document.getElementById("game-container");
@@ -1775,9 +1996,16 @@ $("btn-fullscreen").addEventListener("click", () => {
 });
 $("btn-diff-back").addEventListener("click", () => showScreen("screen-title"));
 document.querySelectorAll(".btn-diff").forEach(b =>
-  b.addEventListener("click", () => { AudioFX.ensure(); startRun(b.dataset.diff); }));
+  b.addEventListener("click", () => { AudioFX.ensure(); startRun(b.dataset.diff, { startLevel: G.startLevel }); }));
 $("btn-go").addEventListener("click", () => beginLevel());
 $("btn-resume").addEventListener("click", () => togglePause());
+$("btn-haptics").addEventListener("click", () => {
+  HAPTICS = !HAPTICS; Progress.setHaptics(HAPTICS); updateHapticsBtn();
+  if (HAPTICS) haptic(40);
+});
+$("btn-continue").addEventListener("click", () => doContinue());
+$("btn-give-up").addEventListener("click", () => finalizeRun(false));
+$("btn-lc-next").addEventListener("click", () => nextLevelOrVictory());
 $("btn-quit").addEventListener("click", () => {
   G.paused = false;
   Music.setPaused(false);
@@ -1802,8 +2030,11 @@ document.querySelectorAll(".lb-tab").forEach(b =>
 /* ============================ BOUCLE PRINCIPALE ============================ */
 let lastTs = 0;
 function frame(ts) {
-  const dt = Math.min(0.033, (ts - lastTs) / 1000 || 0.016);
+  let dt = Math.min(0.033, (ts - lastTs) / 1000 || 0.016);
   lastTs = ts;
+  /* Ralenti spectaculaire (chute de boss) : le temps de jeu est ralenti,
+   * mais le compte à rebours du ralenti s'écoule en temps réel. */
+  if (G.slowmo > 0) { G.slowmo -= dt; dt *= 0.35; }
   if (G.screen === "playing" && !G.paused) update(dt);
   else {
     // le fond continue de vivre derrière les menus
@@ -1828,5 +2059,6 @@ if (document.addEventListener) {
 }
 
 initBackground();
+updateHapticsBtn();
 showScreen("screen-title");
 requestAnimationFrame(frame);

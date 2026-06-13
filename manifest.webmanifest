@@ -1,0 +1,16 @@
+{
+  "name": "Bourrage de Crâne : Mode Révolution",
+  "short_name": "Bourrage",
+  "description": "Shoot'em up satirique pixel-art : déprogramme les avatars politiques avant la saturation de ton cerveau.",
+  "lang": "fr",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#05030f",
+  "theme_color": "#05030f",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

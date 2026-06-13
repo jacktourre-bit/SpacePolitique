@@ -2,10 +2,19 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="description" content="Bourrage de Crâne : Mode Révolution — shoot'em up satirique pixel-art. Déprogramme les avatars politiques avant la saturation de ton cerveau.">
   <title>Bourrage de Crâne : Mode Révolution</title>
   <link rel="stylesheet" href="style.css">
+
+  <!-- PWA : installable et jouable hors-ligne -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#05030f">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Bourrage">
 </head>
 <body>
 
@@ -45,12 +54,22 @@
         <strong>Sur mobile : glisse ton doigt, le tir est automatique.</strong></p>
       <div class="menu">
         <button id="btn-start" class="big-btn">LANCER LA PARTIE</button>
+        <button id="btn-levels" class="big-btn">NIVEAUX</button>
+        <button id="btn-daily" class="big-btn">DÉFI DU JOUR</button>
         <button id="btn-leaderboard" class="big-btn">CLASSEMENT</button>
-        <button id="btn-credits" class="big-btn">CRÉDITS</button>
+        <button id="btn-credits" class="big-btn">CRÉDITS · MÉDAILLES</button>
         <button id="btn-fullscreen" class="big-btn">PLEIN ÉCRAN</button>
       </div>
       <p class="disclaimer">Satire pixelisée — personnages caricaturaux de fiction.<br>
         Ici on ne tue personne : on <em>déprogramme</em>.</p>
+    </div>
+
+    <!-- ===================== SÉLECTION DE NIVEAU ===================== -->
+    <div id="screen-levelselect" class="screen hidden">
+      <h2 class="screen-title">CHOISIR UN NIVEAU</h2>
+      <p class="intro-text">Les niveaux se débloquent au fur et à mesure.</p>
+      <div id="ls-grid"></div>
+      <button id="btn-ls-back" class="small-btn">← RETOUR</button>
     </div>
 
     <!-- ===================== DIFFICULTÉ ===================== -->
@@ -77,8 +96,29 @@
       <h2 class="screen-title">PAUSE</h2>
       <div class="menu">
         <button id="btn-resume" class="big-btn">REPRENDRE</button>
+        <button id="btn-haptics" class="big-btn">VIBRATIONS : ON</button>
         <button id="btn-quit" class="big-btn">ABANDONNER</button>
       </div>
+    </div>
+
+    <!-- ===================== CONTINUER ? ===================== -->
+    <div id="screen-continue" class="screen hidden translucent">
+      <h2 class="screen-title danger">NEURONE EN PÉRIL</h2>
+      <p class="result-line">Tu peux reprendre ce niveau en gardant ton score.</p>
+      <p class="result-line">Continues restants : <span id="cont-count">0</span></p>
+      <div class="menu">
+        <button id="btn-continue" class="big-btn">CONTINUER</button>
+        <button id="btn-give-up" class="big-btn">ARRÊTER LÀ</button>
+      </div>
+    </div>
+
+    <!-- ===================== RÉCAP DE NIVEAU ===================== -->
+    <div id="screen-levelclear" class="screen hidden">
+      <h2 class="screen-title gold">ZONE DÉPROGRAMMÉE !</h2>
+      <p id="lc-name" class="intro-text"></p>
+      <div id="lc-stats"></div>
+      <div id="lc-medals"></div>
+      <button id="btn-lc-next" class="big-btn">NIVEAU SUIVANT →</button>
     </div>
 
     <!-- ===================== GAME OVER ===================== -->
@@ -135,15 +175,28 @@
         Chaque partie est unique : les trajectoires et stratégies ennemies
         sont retirées au sort à chaque run.
       </p>
+      <h3 class="medals-title">MÉDAILLES</h3>
+      <div id="credits-medals"></div>
       <button id="btn-credits-back" class="small-btn">← RETOUR</button>
     </div>
   </div>
 
-  <!-- Données, musique, puis moteur -->
+  <!-- Données, progression, musique, puis moteur -->
   <script src="characters.js"></script>
   <script src="levels.js"></script>
   <script src="leaderboard.js"></script>
+  <script src="progress.js"></script>
   <script src="music.js"></script>
   <script src="game.js"></script>
+  <script>
+    /* Enregistre le service worker (PWA hors-ligne / installable).
+       Sans effet si le jeu est ouvert via file:// — il faut un serveur ou
+       GitHub Pages. */
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("sw.js").catch(() => {});
+      });
+    }
+  </script>
 </body>
 </html>

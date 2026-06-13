@@ -61,10 +61,38 @@ style.css        Style arcade rétro mobile-first + animations CSS des têtes
 characters.js    38 caricatures + 4 sbires fictifs : stats, palettes, répliques
 levels.js        Les 10 niveaux + phases du boss final
 leaderboard.js   Classement localStorage (global/mois/semaine/jour) + anti-triche MVP
-music.js         Musique chiptune 16-bit générée en WebAudio (6 thèmes, zéro fichier)
+progress.js      Progression sauvegardée : niveaux débloqués, médailles, meilleur score
+music.js         Musique chiptune 16-bit générée en WebAudio (12 thèmes, zéro fichier)
 game.js          Moteur : boucle 60 FPS, sprites procéduraux, patterns, boss, audio
+manifest.webmanifest / sw.js   PWA : installable sur l'écran d'accueil, jouable hors-ligne
+icon-*.png       Icônes de l'application (générées)
 leaderboard-api.md  Plan de migration vers un leaderboard global (Supabase/REST)
 ```
+
+## ✨ Confort de jeu
+
+- **Progression sauvegardée** : les niveaux se débloquent au fur et à mesure ;
+  écran **NIVEAUX** pour reprendre n'importe quel niveau débloqué (avec un
+  armement de départ adapté). Plus besoin de tout recommencer.
+- **Continues** : Facile en offre 2, Normal 1, Cauchemar 0. À la mort, on peut
+  reprendre le niveau en gardant son score.
+- **Application installable (PWA)** : « Ajouter à l'écran d'accueil » donne une
+  vraie icône, le plein écran sans barre de navigateur, et le jeu marche
+  **hors-ligne** (service worker). Nécessite d'être servi en HTTP(S) — par
+  exemple via GitHub Pages.
+- **Vibrations** (mobile) : retour haptique aux coups encaissés, bonus et chute
+  de boss. Activable/désactivable depuis la pause.
+- **Aides de jeu** : flèches d'alerte pour les ennemis qui entrent hors écran,
+  réticule rouge sur les piqués kamikazes, vignette pulsante quand le bourrage
+  devient critique ; le mode Facile démarre avec un bouclier et subit moins de
+  piqués.
+- **Récap de fin de niveau** : score gagné, combo max, précision, temps, et
+  **médailles** débloquées (Pacifiste, Intouchable, Tireur d'élite, Combo de
+  tribun, Calibré, Arsenal complet, Briseur de Sénat, Révolutionnaire). Galerie
+  des médailles dans l'écran Crédits. Petit **ralenti spectaculaire** à la chute
+  de chaque boss.
+- **Défi du jour** : tout le monde affronte le même cerveau (seed du jour) et se
+  compare dans l'onglet « JOUR » du classement.
 
 ## ⚙️ Systèmes de jeu
 
